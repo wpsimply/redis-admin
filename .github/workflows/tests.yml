@@ -1,0 +1,92 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_call:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          extensions: redis, mbstring
+          coverage: none
+          tools: none
+
+      - name: PHP syntax
+        run: find . -name '*.php' -not -path './vendor/*' -print0 | xargs -0 -n1 php -l > /dev/null
+
+      - name: JavaScript syntax
+        run: node --check public/assets/app.js
+
+      - name: Validate composer.json
+        run: composer validate --strict --no-check-publish
+
+      - name: Release archive builds
+        run: |
+          build/release.sh 0.0.0-ci /tmp/dist
+          unzip -l /tmp/dist/redis-admin-0.0.0-ci.zip
+
+  test:
+    name: PHP ${{ matrix.php }} · ${{ matrix.server }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.3', '8.4', '8.5']
+        server: ['redis:8']
+        include:
+          - php: '8.5'
+            server: 'redis:7'
+          - php: '8.5'
+            server: 'redis:6.2'
+          - php: '8.5'
+            server: 'valkey/valkey:8'
+
+    services:
+      redis:
+        image: ${{ matrix.server }}
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping || valkey-cli ping"
+          --health-interval 2s
+          --health-timeout 3s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: redis, mbstring
+          coverage: none
+          tools: none
+
+      # For the test that replays a redis-cli export.
+      - name: Install redis-cli
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq redis-tools
+
+      - name: Unit tests
+        run: php tests/run.php
+
+      - name: Integration tests
+        run: php tests/run.php
+        env:
+          REDIS_ADMIN_TEST_HOST: 127.0.0.1
+          REDIS_ADMIN_TEST_PORT: 6379

@@ -18,13 +18,18 @@ A small, self-hosted web UI for Redis and Valkey, built to sit next to a hosting
 
 ## Install
 
-Download a release and unpack it, or clone the repository:
+Download the zip from the [latest release](https://github.com/wpsimply/redis-admin/releases/latest). It holds only the files a server needs, inside a single `redis-admin/` directory:
 
 ```sh
-git clone https://github.com/wpsimply/redis-admin.git /var/www/redis-admin
-cd /var/www/redis-admin
-cp .env.example .env
+version=1.0.0
+curl -fsSLO "https://github.com/wpsimply/redis-admin/releases/download/v${version}/redis-admin-${version}.zip"
+curl -fsSLO "https://github.com/wpsimply/redis-admin/releases/download/v${version}/redis-admin-${version}.zip.sha256"
+sha256sum -c "redis-admin-${version}.zip.sha256"
+unzip -q "redis-admin-${version}.zip" -d /var/www
+cd /var/www/redis-admin && cp .env.example .env
 ```
+
+Cloning the repository works too, but brings the tests and CI files along.
 
 Composer is optional. If you prefer it:
 
@@ -107,7 +112,7 @@ The token is spent on first use and expires after `REDIS_ADMIN_TOKEN_TTL` second
 
 ```sh
 php -S 127.0.0.1:8080 -t public     # with REDIS_ADMIN_SESSION_SECURE=false in .env
-php tests/run.php                   # unit tests only
+php tests/run.php                   # unit tests only; CI also runs them against Redis 6.2–8 and Valkey 8
 REDIS_ADMIN_TEST_SOCKET=/tmp/redis.sock php tests/run.php   # plus Redis integration tests
 ```
 
@@ -118,6 +123,16 @@ To get a session locally, drop a token into `storage/sso-tokens/` and open `/sso
 ```sh
 t=$(php -r 'echo bin2hex(random_bytes(32));'); echo '{"target":"local"}' > storage/sso-tokens/$t; echo "http://127.0.0.1:8080/sso.php?token=$t"
 ```
+
+## Releasing
+
+Set the new version in `VERSION`, commit, then push a tag:
+
+```sh
+git tag v1.0.0 && git push origin v1.0.0
+```
+
+The release workflow runs the test suite, then builds `redis-admin-<version>.zip` with `build/release.sh`: `bootstrap.php`, `src/`, `public/`, empty `storage/` directories, the example config, the README and the license. It refuses to publish if git files, tests or other development files end up in the archive. It attaches the zip and its SHA-256 checksum to a GitHub release. Tags with a suffix, such as `v1.1.0-rc.1`, are published as prereleases. You can build the same archive locally with `build/release.sh 1.0.0`.
 
 ## License
 

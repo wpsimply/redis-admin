@@ -1,0 +1,62 @@
+name: Release
+
+# Push a tag like v1.2.3 to test, build and publish a release. The archive
+# holds only the runtime files; see build/release.sh.
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+jobs:
+  tests:
+    uses: ./.github/workflows/tests.yml
+
+  release:
+    name: Publish
+    needs: tests
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build archive
+        id: build
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          archive="$(build/release.sh "$version" dist)"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=$archive" >> "$GITHUB_OUTPUT"
+          unzip -l "$archive"
+
+      - name: Refuse an archive with git or test files
+        env:
+          ARCHIVE: ${{ steps.build.outputs.archive }}
+        run: |
+          # Development directories at the top level, and git or macOS metadata
+          # at any depth. (public/assets/vendor is the bundled Alpine, and ships.)
+          if unzip -Z1 "$ARCHIVE" | grep -E '^redis-admin/(tests|examples|build|vendor)(/|$)|(^|/)\.git|\.DS_Store$'; then
+            echo "The archive contains files that must not be shipped." >&2
+            exit 1
+          fi
+
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+          ARCHIVE: ${{ steps.build.outputs.archive }}
+        run: |
+          prerelease=""
+          case "$TAG" in *-*) prerelease="--prerelease" ;; esac
+
+          if gh release view "$TAG" > /dev/null 2>&1; then
+            gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
+          else
+            gh release create "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
+              --title "Redis Admin ${TAG#v}" \
+              --generate-notes \
+              --verify-tag \
+              $prerelease
+          fi
