@@ -13,7 +13,7 @@ A small, self-hosted web UI for Redis and Valkey, built to sit next to a hosting
 
 ## Requirements
 
-- PHP 8.3 or newer with the `redis` (phpredis) and `mbstring` extensions
+- PHP 8.3 or newer with the `redis` (phpredis), `mbstring` and `session` extensions
 - Redis 6.2+ or Valkey 7+
 - A web server that serves only the `public/` directory
 
@@ -32,13 +32,40 @@ cd /var/www/redis-admin && cp .env.example .env
 
 Cloning the repository works too, but brings the tests and CI files along.
 
-Composer is optional. If you prefer it:
+### With Composer
+
+The app doesn't need Composer, but it can be installed with it:
 
 ```sh
 composer create-project wpsimply/redis-admin /var/www/redis-admin
 ```
 
-Then make the storage directories writable by the PHP-FPM pool user and nobody else:
+This installs the runtime files and leaves out the tests, examples and CI files, like the release zip. It also copies `.env.example` to `.env`, sets the storage directories to `0700`, and generates `vendor/autoload.php`. When that file exists, `bootstrap.php` uses it instead of its own autoloader, so any package you add with `composer require` is also available in `config.php`. `vendor/` sits outside `public/`, so the web server never serves it.
+
+Composer checks the PHP extensions of the CLI PHP. If only PHP-FPM has phpredis, add `--ignore-platform-req=ext-redis`. The app checks its requirements again when it runs.
+
+`create-project` doesn't update an existing install. To upgrade, install the new version into a fresh directory, copy `.env`, `config.php` (if you have one) and `storage/sessions/` across, then swap the two directories.
+
+### As a Composer dependency
+
+To pin Redis Admin alongside other packages, for example in your control panel's repository, require it instead:
+
+```sh
+composer require wpsimply/redis-admin
+```
+
+Composer replaces the whole `vendor/wpsimply/redis-admin/` directory on every update, so keep your configuration and state outside it. Set `REDIS_ADMIN_HOME` in the real environment (the PHP-FPM pool's `env[...]`, see [`examples/php-fpm.conf`](examples/php-fpm.conf)) to a directory that holds `.env`, `config.php` and `storage/`:
+
+```sh
+mkdir -p /etc/redis-admin/storage/sessions /etc/redis-admin/storage/sso-tokens
+cp vendor/wpsimply/redis-admin/.env.example /etc/redis-admin/.env
+```
+
+`REDIS_ADMIN_HOME` can't be set in `.env`, because it decides where `.env` is read from. Point the web server at `vendor/wpsimply/redis-admin/public`, and apply the permissions below to `/etc/redis-admin/storage`. Composer doesn't run a dependency's scripts, so none of the `create-project` setup happens here.
+
+### Permissions
+
+Whichever way you installed it, make the storage directories writable by the PHP-FPM pool user and nobody else:
 
 ```sh
 chown -R www-data:www-data storage

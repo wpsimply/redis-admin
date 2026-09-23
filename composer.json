@@ -4,21 +4,35 @@
     "type": "project",
     "license": "MIT",
     "keywords": ["redis", "valkey", "admin", "gui", "sso"],
+    "homepage": "https://github.com/wpsimply/redis-admin",
+    "support": {
+        "issues": "https://github.com/wpsimply/redis-admin/issues",
+        "source": "https://github.com/wpsimply/redis-admin"
+    },
     "require": {
         "php": ">=8.3",
         "ext-json": "*",
         "ext-mbstring": "*",
-        "ext-redis": "*"
+        "ext-redis": "*",
+        "ext-session": "*"
     },
     "autoload": {
         "psr-4": {
             "RedisAdmin\\": "src/"
         }
     },
+    "config": {
+        "optimize-autoloader": true,
+        "sort-packages": true
+    },
     "scripts": {
         "test": "@php tests/run.php",
         "post-create-project-cmd": [
-            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\"",
+            "@php -r \"foreach (['storage/sessions', 'storage/sso-tokens'] as \\$dir) { is_dir(\\$dir) || mkdir(\\$dir, 0700, true); chmod(\\$dir, 0700); }\""
         ]
+    },
+    "scripts-descriptions": {
+        "test": "Run the test suite (needs a git clone; the Composer package leaves the tests out)."
     }
 }

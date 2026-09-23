@@ -12,6 +12,7 @@ use RedisAdmin\Formatter;
 use RedisAdmin\TokenStore;
 use RedisAdmin\Transfer;
 use RedisAdmin\UserError;
+use RuntimeException;
 
 /**
  * Everything that needs no Redis.
@@ -67,6 +68,22 @@ final class UnitTest extends TestCase
         self::assertSame(7000, $config->get('redis.port'));
         self::assertSame(false, $config->get('session.secure'));
         self::assertSame($dir.'/storage/sso-tokens', $config->get('sso.token_dir'));
+    }
+
+    public function testHomeComesFromTheRealEnvironmentOnly(): void
+    {
+        $dir = self::tempDir();
+
+        self::assertSame('/app', Env::home('/app', []));
+        self::assertSame('/app', Env::home('/app', ['REDIS_ADMIN_HOME' => ' ']));
+        self::assertSame(realpath($dir), Env::home('/app', ['REDIS_ADMIN_HOME' => $dir.'/']));
+        self::assertThrows(RuntimeException::class, fn () => Env::home('/app', ['REDIS_ADMIN_HOME' => $dir.'/missing']), 'not a directory');
+
+        file_put_contents($dir.'/.env', "REDIS_ADMIN_TITLE=From home\n");
+        $config = Config::fromArray($dir, Env::overrides($dir.'/.env', []));
+
+        self::assertSame('From home', $config->get('title'));
+        self::assertSame($dir.'/storage/sessions', $config->get('session.save_path'));
     }
 
     public function testTokenIsSpentOnFirstUse(): void

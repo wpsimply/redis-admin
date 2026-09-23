@@ -3,19 +3,25 @@
 declare(strict_types=1);
 
 use RedisAdmin\Config;
+use RedisAdmin\Env;
 
 if (PHP_VERSION_ID < 80300) {
     http_response_code(500);
     exit('Redis Admin requires PHP 8.3 or newer.');
 }
 
-if (! extension_loaded('redis')) {
-    http_response_code(500);
-    exit('Redis Admin requires the phpredis extension (php-redis).');
+foreach (['redis' => 'phpredis (php-redis)', 'mbstring' => 'mbstring', 'session' => 'session'] as $extension => $name) {
+    if (! extension_loaded($extension)) {
+        http_response_code(500);
+        exit("Redis Admin requires the {$name} extension.");
+    }
 }
 
-// Composer's autoloader when the app was installed with Composer; a release
-// unpacked from a tarball has no vendor directory and needs none.
+// Installed with composer create-project (or composer install in a clone),
+// vendor/autoload.php exists and is used, so anything config.php pulls in
+// through Composer loads too. A release zip has no vendor directory, and
+// neither does the package when another project requires it: the app has no
+// dependencies, so its own classes are all there is to load.
 if (is_file(__DIR__.'/vendor/autoload.php')) {
     require __DIR__.'/vendor/autoload.php';
 } else {
@@ -45,4 +51,13 @@ function redis_admin_headers(): void
     header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 }
 
-return Config::load(__DIR__);
+// .env, config.php and storage/ live here, or in REDIS_ADMIN_HOME when the
+// app is installed as a Composer dependency and must survive updates.
+try {
+    $home = Env::home(__DIR__);
+} catch (RuntimeException $e) {
+    http_response_code(500);
+    exit($e->getMessage());
+}
+
+return Config::load($home);

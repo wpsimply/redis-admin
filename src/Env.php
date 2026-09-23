@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace RedisAdmin;
 
+use RuntimeException;
+
 /**
  * Reads configuration from the environment and an optional .env file.
  *
@@ -43,6 +45,33 @@ final class Env
         'REDIS_ADMIN_BULK_BUDGET' => ['limits.bulk_budget', 'int'],
         'REDIS_ADMIN_DECODE_SERIALIZED' => ['decode_serialized', 'bool'],
     ];
+
+    /**
+     * The directory holding .env, config.php and storage/: REDIS_ADMIN_HOME
+     * when the real environment sets it, the application directory otherwise.
+     * It locates .env, so .env itself cannot set it.
+     *
+     * An install under vendor/ is replaced wholesale on every Composer update;
+     * pointing this outside it keeps the configuration and sessions.
+     *
+     * @param  array<string, string>|null  $environment  defaults to the real environment
+     */
+    public static function home(string $default, ?array $environment = null): string
+    {
+        $dir = trim(($environment ?? self::environment())['REDIS_ADMIN_HOME'] ?? '');
+
+        if ($dir === '') {
+            return $default;
+        }
+
+        $real = realpath($dir);
+
+        if ($real === false || ! is_dir($real)) {
+            throw new RuntimeException("REDIS_ADMIN_HOME is not a directory: {$dir}");
+        }
+
+        return $real;
+    }
 
     /**
      * The config overrides the environment describes, as a nested array.
