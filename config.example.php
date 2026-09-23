@@ -17,7 +17,7 @@ return [
      * Use either a Unix socket or a host and port.
      */
     'redis' => [
-        'socket' => '/run/redis-admin/{target}.sock',
+        'socket' => '/run/redis-simply/{target}.sock',
         // 'host' => '127.0.0.1',
         // 'port' => 6379,
         'timeout' => 3.0,
@@ -36,7 +36,7 @@ return [
 
     'session' => [
         'save_path' => __DIR__.'/storage/sessions',
-        'name' => 'RedisAdminSession',
+        'name' => 'RedisSimplySession',
         'secure' => true,
         'idle_timeout' => 1800,
         'lifetime' => 28800,
@@ -48,7 +48,7 @@ return [
      */
     'panel_url' => null,
 
-    'title' => 'Redis Admin',
+    'title' => 'Redis Simply',
 
     'limits' => [
         // Bytes of a string value sent to the browser before it is truncated.

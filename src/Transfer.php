@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 use Generator;
 
@@ -65,13 +65,13 @@ final class Transfer
 
         if ($format === 'json') {
             $write(sprintf(
-                "{\n\"format\": \"redis-admin\",\n\"version\": %d,\n\"db\": %d,\n\"exported_at\": %s,\n\"keys\": [",
+                "{\n\"format\": \"redis-simply\",\n\"version\": %d,\n\"db\": %d,\n\"exported_at\": %s,\n\"keys\": [",
                 self::FORMAT_VERSION,
                 $db,
                 json_encode(gmdate('c')),
             ));
         } else {
-            $write(sprintf("# Redis Admin export, db %d, %s\n# Replay with: redis-cli -n %d < this-file\n", $db, gmdate('c'), $db));
+            $write(sprintf("# Redis Simply export, db %d, %s\n# Replay with: redis-cli -n %d < this-file\n", $db, gmdate('c'), $db));
         }
 
         foreach ($keys as $key) {
@@ -133,12 +133,12 @@ final class Transfer
     {
         $document = json_decode($json, true, 512, JSON_BIGINT_AS_STRING);
 
-        if (! is_array($document) || ($document['format'] ?? null) !== 'redis-admin' || ! isset($document['keys']) || ! is_array($document['keys'])) {
-            throw new UserError('This is not a Redis Admin JSON export.');
+        if (! is_array($document) || ($document['format'] ?? null) !== 'redis-simply' || ! isset($document['keys']) || ! is_array($document['keys'])) {
+            throw new UserError('This is not a Redis Simply JSON export.');
         }
 
         if ((int) ($document['version'] ?? 0) > self::FORMAT_VERSION) {
-            throw new UserError('This export was made by a newer version of Redis Admin.');
+            throw new UserError('This export was made by a newer version of Redis Simply.');
         }
 
         $result = ['imported' => 0, 'skipped' => 0, 'failed' => []];

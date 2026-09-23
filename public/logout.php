@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Session;
+use RedisSimply\Session;
 
 $config = require dirname(__DIR__).'/bootstrap.php';
 
-redis_admin_headers();
+redis_simply_headers();
 
 $session = new Session($config);
 

@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Client;
-use RedisAdmin\Codec;
-use RedisAdmin\Connection;
-use RedisAdmin\Session;
-use RedisAdmin\Transfer;
-use RedisAdmin\UserError;
+use RedisSimply\Client;
+use RedisSimply\Codec;
+use RedisSimply\Connection;
+use RedisSimply\Session;
+use RedisSimply\Transfer;
+use RedisSimply\UserError;
 
 $config = require dirname(__DIR__).'/bootstrap.php';
 
-redis_admin_headers();
+redis_simply_headers();
 
 $session = new Session($config);
 $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
@@ -27,7 +27,7 @@ try {
 if ($grant === null || ($isPost && ! $session->verifyCsrf($_POST['csrf'] ?? null))) {
     http_response_code($grant === null ? 401 : 419);
     header('Content-Type: text/plain; charset=utf-8');
-    exit($grant === null ? 'Your session has ended. Open Redis Admin again from your control panel.' : 'Your session token is out of date. Reload the page.');
+    exit($grant === null ? 'Your session has ended. Open Redis Simply again from your control panel.' : 'Your session token is out of date. Reload the page.');
 }
 
 $session->release();

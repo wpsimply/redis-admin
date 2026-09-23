@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Client;
-use RedisAdmin\Connection;
-use RedisAdmin\Session;
-use RedisAdmin\Transfer;
-use RedisAdmin\UserError;
+use RedisSimply\Client;
+use RedisSimply\Connection;
+use RedisSimply\Session;
+use RedisSimply\Transfer;
+use RedisSimply\UserError;
 
 $config = require dirname(__DIR__).'/bootstrap.php';
 
-redis_admin_headers();
+redis_simply_headers();
 header('Content-Type: application/json; charset=utf-8');
 
 $session = new Session($config);
@@ -19,7 +19,7 @@ try {
     $grant = $session->grant($_POST['db'] ?? null);
 
     if ($grant === null) {
-        throw new UserError('Your session has ended. Open Redis Admin again from your control panel.', 401);
+        throw new UserError('Your session has ended. Open Redis Simply again from your control panel.', 401);
     }
 
     if (($_SERVER['REQUEST_METHOD'] ?? 'GET') !== 'POST') {

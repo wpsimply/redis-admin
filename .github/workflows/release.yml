@@ -37,7 +37,7 @@ jobs:
         run: |
           # Development directories at the top level, and git or macOS metadata
           # at any depth. (public/assets/vendor is the bundled Alpine, and ships.)
-          if unzip -Z1 "$ARCHIVE" | grep -E '^redis-admin/(tests|examples|build|vendor)(/|$)|(^|/)\.git|\.DS_Store$'; then
+          if unzip -Z1 "$ARCHIVE" | grep -E '^redis-simply/(tests|examples|build|vendor)(/|$)|(^|/)\.git|\.DS_Store$'; then
             echo "The archive contains files that must not be shipped." >&2
             exit 1
           fi
@@ -55,7 +55,7 @@ jobs:
             gh release upload "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" --clobber
           else
             gh release create "$TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
-              --title "Redis Admin ${TAG#v}" \
+              --title "Redis Simply ${TAG#v}" \
               --generate-notes \
               --verify-tag \
               $prerelease

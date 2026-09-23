@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * The JSON API behind the UI: one action per request.
@@ -40,7 +40,7 @@ final class Api
         $grant = $this->session->grant($query['db'] ?? null);
 
         if ($grant === null) {
-            throw new UserError('Your session has ended. Open Redis Admin again from your control panel.', 401);
+            throw new UserError('Your session has ended. Open Redis Simply again from your control panel.', 401);
         }
 
         $isRead = in_array($action, self::READS, true);

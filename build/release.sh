@@ -1,11 +1,11 @@
 #!/bin/sh
 #
-# Build the release archive: only what a server needs to run Redis Admin.
+# Build the release archive: only what a server needs to run Redis Simply.
 #
 # Usage: build/release.sh <version> [output-dir]
 #
-# Produces <output-dir>/redis-admin-<version>.zip (and a .sha256 next to it)
-# with a single top-level redis-admin/ directory. Tests, examples, CI and
+# Produces <output-dir>/redis-simply-<version>.zip (and a .sha256 next to it)
+# with a single top-level redis-simply/ directory. Tests, examples, CI and
 # every git file are left out; the storage directories are created empty.
 set -eu
 
@@ -23,7 +23,7 @@ out_dir="$(cd "$out_dir" && pwd)"
 stage="$(mktemp -d)"
 trap 'rm -rf "$stage"' EXIT
 
-app="$stage/redis-admin"
+app="$stage/redis-simply"
 mkdir -p "$app"
 
 # The runtime, and the files that tell someone how to configure it.
@@ -40,9 +40,9 @@ chmod 700 "$app/storage/sessions" "$app/storage/sso-tokens"
 # Nothing from a developer's machine or git may ride along.
 find "$app" \( -name '.git*' -o -name '.DS_Store' -o -name '*.swp' \) -exec rm -rf {} +
 
-archive="$out_dir/redis-admin-$version.zip"
+archive="$out_dir/redis-simply-$version.zip"
 rm -f "$archive"
-(cd "$stage" && zip -qrX "$archive" redis-admin)
+(cd "$stage" && zip -qrX "$archive" redis-simply)
 
 (cd "$out_dir" && if command -v sha256sum >/dev/null 2>&1; then
     sha256sum "$(basename "$archive")"

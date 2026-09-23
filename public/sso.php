@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Session;
-use RedisAdmin\TokenStore;
-use RedisAdmin\UserError;
+use RedisSimply\Session;
+use RedisSimply\TokenStore;
+use RedisSimply\UserError;
 
 $config = require dirname(__DIR__).'/bootstrap.php';
 
-redis_admin_headers();
+redis_simply_headers();
 
 $tokens = new TokenStore((string) $config->get('sso.token_dir'), $config->int('sso.token_ttl'));
 $session = new Session($config);

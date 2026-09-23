@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * Read-only facts about the instance: version, memory, hit rate, and how many

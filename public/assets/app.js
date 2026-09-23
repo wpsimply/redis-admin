@@ -1,5 +1,5 @@
 /*
- * Redis Admin UI. Plain Alpine.js, no build step.
+ * Redis Simply UI. Plain Alpine.js, no build step.
  *
  * Values from the API are either a string (valid UTF-8) or {"$b64": "..."}
  * for binary data, and are sent back in the same shape.
@@ -23,7 +23,7 @@ document.addEventListener('alpine:init', () => {
         return new TextDecoder('utf-8', { fatal: true }).decode(bytes);
     };
 
-    Alpine.data('redisAdmin', () => ({
+    Alpine.data('redisSimply', () => ({
         csrf: document.querySelector('meta[name="csrf-token"]').content,
         session: { label: '', databases: 16, prefix: null },
         types: ['string', 'hash', 'list', 'set', 'zset', 'stream'],
@@ -150,7 +150,7 @@ document.addEventListener('alpine:init', () => {
         /**
          * Write what the page is showing into its URL, replacing the history
          * entry rather than adding one, so a reload lands on the same page and
-         * Back still leaves Redis Admin instead of stepping through every click.
+         * Back still leaves Redis Simply instead of stepping through every click.
          *
          * Run from x-effect, so it re-runs whenever anything it reads changes.
          * `urlReady` is read first: until the URL has been restored, writing it

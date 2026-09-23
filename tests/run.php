@@ -7,13 +7,13 @@ declare(strict_types=1);
  *
  * Every public method named test* on a class in tests/*Test.php runs on a
  * fresh instance, with setUp()/tearDown() around it. Tests that need Redis
- * connect to REDIS_ADMIN_TEST_SOCKET, or REDIS_ADMIN_TEST_HOST and
- * REDIS_ADMIN_TEST_PORT, and are skipped when neither is set. They flush the
- * database they use (REDIS_ADMIN_TEST_DB, default 15), so never point them at
+ * connect to REDIS_SIMPLY_TEST_SOCKET, or REDIS_SIMPLY_TEST_HOST and
+ * REDIS_SIMPLY_TEST_PORT, and are skipped when neither is set. They flush the
+ * database they use (REDIS_SIMPLY_TEST_DB, default 15), so never point them at
  * an instance holding data you care about.
  */
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
 use Throwable;
 
@@ -77,8 +77,8 @@ printf(
     $results['fail'],
     $results['skip'],
     microtime(true) - $started,
-    $results['skip'] > 0 && getenv('REDIS_ADMIN_TEST_SOCKET') === false && getenv('REDIS_ADMIN_TEST_HOST') === false
-        ? ' - set REDIS_ADMIN_TEST_SOCKET or REDIS_ADMIN_TEST_HOST to run the Redis tests'
+    $results['skip'] > 0 && getenv('REDIS_SIMPLY_TEST_SOCKET') === false && getenv('REDIS_SIMPLY_TEST_HOST') === false
+        ? ' - set REDIS_SIMPLY_TEST_SOCKET or REDIS_SIMPLY_TEST_HOST to run the Redis tests'
         : '',
 );
 

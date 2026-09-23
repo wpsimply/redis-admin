@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * The signed-in session: which Redis instance it may use, and its CSRF token.

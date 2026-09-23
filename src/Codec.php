@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * Carries Redis's binary-safe strings through JSON.

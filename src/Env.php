@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 use RuntimeException;
 
 /**
  * Reads configuration from the environment and an optional .env file.
  *
- * Only REDIS_ADMIN_* variables are considered. A variable set in the real
+ * Only REDIS_SIMPLY_* variables are considered. A variable set in the real
  * environment (PHP-FPM's `env[...]`, a container, the shell) wins over the
  * same variable in .env, the way dotenv loaders usually behave. Nothing is
  * written back into the process environment.
@@ -24,30 +24,30 @@ final class Env
      * Environment variable => config path, with the type it is read as.
      */
     public const array MAP = [
-        'REDIS_ADMIN_TITLE' => ['title', 'string'],
-        'REDIS_ADMIN_PANEL_URL' => ['panel_url', 'string'],
-        'REDIS_ADMIN_SOCKET' => ['redis.socket', 'string'],
-        'REDIS_ADMIN_HOST' => ['redis.host', 'string'],
-        'REDIS_ADMIN_PORT' => ['redis.port', 'int'],
-        'REDIS_ADMIN_TIMEOUT' => ['redis.timeout', 'float'],
-        'REDIS_ADMIN_READ_TIMEOUT' => ['redis.read_timeout', 'float'],
-        'REDIS_ADMIN_DATABASES' => ['redis.databases', 'int'],
-        'REDIS_ADMIN_TOKEN_DIR' => ['sso.token_dir', 'string'],
-        'REDIS_ADMIN_TOKEN_TTL' => ['sso.token_ttl', 'int'],
-        'REDIS_ADMIN_SESSION_PATH' => ['session.save_path', 'string'],
-        'REDIS_ADMIN_SESSION_NAME' => ['session.name', 'string'],
-        'REDIS_ADMIN_SESSION_SECURE' => ['session.secure', 'bool'],
-        'REDIS_ADMIN_SESSION_IDLE_TIMEOUT' => ['session.idle_timeout', 'int'],
-        'REDIS_ADMIN_SESSION_LIFETIME' => ['session.lifetime', 'int'],
-        'REDIS_ADMIN_STRING_PREVIEW' => ['limits.string_preview', 'int'],
-        'REDIS_ADMIN_ITEM_PREVIEW' => ['limits.item_preview', 'int'],
-        'REDIS_ADMIN_SCAN_PAGE' => ['limits.scan_page', 'int'],
-        'REDIS_ADMIN_BULK_BUDGET' => ['limits.bulk_budget', 'int'],
-        'REDIS_ADMIN_DECODE_SERIALIZED' => ['decode_serialized', 'bool'],
+        'REDIS_SIMPLY_TITLE' => ['title', 'string'],
+        'REDIS_SIMPLY_PANEL_URL' => ['panel_url', 'string'],
+        'REDIS_SIMPLY_SOCKET' => ['redis.socket', 'string'],
+        'REDIS_SIMPLY_HOST' => ['redis.host', 'string'],
+        'REDIS_SIMPLY_PORT' => ['redis.port', 'int'],
+        'REDIS_SIMPLY_TIMEOUT' => ['redis.timeout', 'float'],
+        'REDIS_SIMPLY_READ_TIMEOUT' => ['redis.read_timeout', 'float'],
+        'REDIS_SIMPLY_DATABASES' => ['redis.databases', 'int'],
+        'REDIS_SIMPLY_TOKEN_DIR' => ['sso.token_dir', 'string'],
+        'REDIS_SIMPLY_TOKEN_TTL' => ['sso.token_ttl', 'int'],
+        'REDIS_SIMPLY_SESSION_PATH' => ['session.save_path', 'string'],
+        'REDIS_SIMPLY_SESSION_NAME' => ['session.name', 'string'],
+        'REDIS_SIMPLY_SESSION_SECURE' => ['session.secure', 'bool'],
+        'REDIS_SIMPLY_SESSION_IDLE_TIMEOUT' => ['session.idle_timeout', 'int'],
+        'REDIS_SIMPLY_SESSION_LIFETIME' => ['session.lifetime', 'int'],
+        'REDIS_SIMPLY_STRING_PREVIEW' => ['limits.string_preview', 'int'],
+        'REDIS_SIMPLY_ITEM_PREVIEW' => ['limits.item_preview', 'int'],
+        'REDIS_SIMPLY_SCAN_PAGE' => ['limits.scan_page', 'int'],
+        'REDIS_SIMPLY_BULK_BUDGET' => ['limits.bulk_budget', 'int'],
+        'REDIS_SIMPLY_DECODE_SERIALIZED' => ['decode_serialized', 'bool'],
     ];
 
     /**
-     * The directory holding .env, config.php and storage/: REDIS_ADMIN_HOME
+     * The directory holding .env, config.php and storage/: REDIS_SIMPLY_HOME
      * when the real environment sets it, the application directory otherwise.
      * It locates .env, so .env itself cannot set it.
      *
@@ -58,7 +58,7 @@ final class Env
      */
     public static function home(string $default, ?array $environment = null): string
     {
-        $dir = trim(($environment ?? self::environment())['REDIS_ADMIN_HOME'] ?? '');
+        $dir = trim(($environment ?? self::environment())['REDIS_SIMPLY_HOME'] ?? '');
 
         if ($dir === '') {
             return $default;
@@ -67,7 +67,7 @@ final class Env
         $real = realpath($dir);
 
         if ($real === false || ! is_dir($real)) {
-            throw new RuntimeException("REDIS_ADMIN_HOME is not a directory: {$dir}");
+            throw new RuntimeException("REDIS_SIMPLY_HOME is not a directory: {$dir}");
         }
 
         return $real;
@@ -183,7 +183,7 @@ final class Env
         $values = [];
 
         foreach ([...$_SERVER, ...$_ENV, ...getenv()] as $name => $value) {
-            if (is_string($name) && str_starts_with($name, 'REDIS_ADMIN_') && is_string($value)) {
+            if (is_string($name) && str_starts_with($name, 'REDIS_SIMPLY_') && is_string($value)) {
                 $values[$name] = $value;
             }
         }

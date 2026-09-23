@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
-use RedisAdmin\Api;
-use RedisAdmin\Codec;
-use RedisAdmin\Connection;
-use RedisAdmin\Session;
-use RedisAdmin\UserError;
+use RedisSimply\Api;
+use RedisSimply\Codec;
+use RedisSimply\Connection;
+use RedisSimply\Session;
+use RedisSimply\UserError;
 
 final class ApiTest extends TestCase
 {

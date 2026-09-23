@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Session;
+use RedisSimply\Session;
 
 $config = require dirname(__DIR__).'/bootstrap.php';
 
-redis_admin_headers();
+redis_simply_headers();
 header('Content-Type: text/html; charset=utf-8');
 
 $session = new Session($config);
@@ -43,7 +43,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         </div>
     </main>
 <?php } else { ?>
-<div class="app" x-data="redisAdmin" x-cloak x-effect="syncUrl()" @keydown.window="shortcut($event)">
+<div class="app" x-data="redisSimply" x-cloak x-effect="syncUrl()" @keydown.window="shortcut($event)">
     <header class="topbar">
         <div class="brand">
             <img src="<?= $e($asset('assets/icon.svg')) ?>" alt="" width="22" height="22">
@@ -336,7 +336,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
 
             <!-- Import -->
             <form x-show="modal === 'import'" @submit.prevent="importFile()">
-                <p class="muted small">Import a JSON file exported by Redis Admin into <strong x-text="'db' + db"></strong>.</p>
+                <p class="muted small">Import a JSON file exported by Redis Simply into <strong x-text="'db' + db"></strong>.</p>
                 <label>File <input type="file" x-ref="importFile" accept=".json,application/json" required :disabled="action === 'import'"></label>
                 <fieldset>
                     <legend>Keys that already exist</legend>

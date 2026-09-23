@@ -2,18 +2,18 @@
 
 declare(strict_types=1);
 
-use RedisAdmin\Config;
-use RedisAdmin\Env;
+use RedisSimply\Config;
+use RedisSimply\Env;
 
 if (PHP_VERSION_ID < 80300) {
     http_response_code(500);
-    exit('Redis Admin requires PHP 8.3 or newer.');
+    exit('Redis Simply requires PHP 8.3 or newer.');
 }
 
 foreach (['redis' => 'phpredis (php-redis)', 'mbstring' => 'mbstring', 'session' => 'session'] as $extension => $name) {
     if (! extension_loaded($extension)) {
         http_response_code(500);
-        exit("Redis Admin requires the {$name} extension.");
+        exit("Redis Simply requires the {$name} extension.");
     }
 }
 
@@ -26,8 +26,8 @@ if (is_file(__DIR__.'/vendor/autoload.php')) {
     require __DIR__.'/vendor/autoload.php';
 } else {
     spl_autoload_register(static function (string $class): void {
-        if (str_starts_with($class, 'RedisAdmin\\')) {
-            $file = __DIR__.'/src/'.str_replace('\\', '/', substr($class, strlen('RedisAdmin\\'))).'.php';
+        if (str_starts_with($class, 'RedisSimply\\')) {
+            $file = __DIR__.'/src/'.str_replace('\\', '/', substr($class, strlen('RedisSimply\\'))).'.php';
 
             if (is_file($file)) {
                 require $file;
@@ -42,7 +42,7 @@ if (is_file(__DIR__.'/vendor/autoload.php')) {
  * from this origin. Alpine evaluates its directives with Function(), which is
  * what 'unsafe-eval' is for; no directive is ever built from Redis data.
  */
-function redis_admin_headers(): void
+function redis_simply_headers(): void
 {
     header('X-Frame-Options: DENY');
     header('X-Content-Type-Options: nosniff');
@@ -51,7 +51,7 @@ function redis_admin_headers(): void
     header("Content-Security-Policy: default-src 'self'; script-src 'self' 'unsafe-eval'; style-src 'self'; img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'");
 }
 
-// .env, config.php and storage/ live here, or in REDIS_ADMIN_HOME when the
+// .env, config.php and storage/ live here, or in REDIS_SIMPLY_HOME when the
 // app is installed as a Composer dependency and must survive updates.
 try {
     $home = Env::home(__DIR__);

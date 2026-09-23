@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
-use RedisAdmin\Codec;
-use RedisAdmin\Config;
-use RedisAdmin\Connection;
-use RedisAdmin\Env;
-use RedisAdmin\Formatter;
-use RedisAdmin\TokenStore;
-use RedisAdmin\Transfer;
-use RedisAdmin\UserError;
+use RedisSimply\Codec;
+use RedisSimply\Config;
+use RedisSimply\Connection;
+use RedisSimply\Env;
+use RedisSimply\Formatter;
+use RedisSimply\TokenStore;
+use RedisSimply\Transfer;
+use RedisSimply\UserError;
 use RuntimeException;
 
 /**
@@ -43,25 +43,25 @@ final class UnitTest extends TestCase
     {
         $parsed = Env::parse(<<<'ENV'
             # comment
-            export REDIS_ADMIN_TITLE="My \"Redis\""
-            REDIS_ADMIN_HOST=10.0.0.1 # inline comment
-            REDIS_ADMIN_PANEL_URL='https://panel.test/#hash'
-            REDIS_ADMIN_SOCKET=
+            export REDIS_SIMPLY_TITLE="My \"Redis\""
+            REDIS_SIMPLY_HOST=10.0.0.1 # inline comment
+            REDIS_SIMPLY_PANEL_URL='https://panel.test/#hash'
+            REDIS_SIMPLY_SOCKET=
             not a line
             ENV);
 
-        self::assertSame('My "Redis"', $parsed['REDIS_ADMIN_TITLE']);
-        self::assertSame('10.0.0.1', $parsed['REDIS_ADMIN_HOST']);
-        self::assertSame('https://panel.test/#hash', $parsed['REDIS_ADMIN_PANEL_URL']);
-        self::assertSame('', $parsed['REDIS_ADMIN_SOCKET']);
+        self::assertSame('My "Redis"', $parsed['REDIS_SIMPLY_TITLE']);
+        self::assertSame('10.0.0.1', $parsed['REDIS_SIMPLY_HOST']);
+        self::assertSame('https://panel.test/#hash', $parsed['REDIS_SIMPLY_PANEL_URL']);
+        self::assertSame('', $parsed['REDIS_SIMPLY_SOCKET']);
     }
 
     public function testRealEnvironmentWinsOverDotenvAndEmptyMeansDefault(): void
     {
         $dir = self::tempDir();
-        file_put_contents($dir.'/.env', "REDIS_ADMIN_PORT=7000\nREDIS_ADMIN_HOST=file-host\nREDIS_ADMIN_TOKEN_DIR=\nREDIS_ADMIN_SESSION_SECURE=false\n");
+        file_put_contents($dir.'/.env', "REDIS_SIMPLY_PORT=7000\nREDIS_SIMPLY_HOST=file-host\nREDIS_SIMPLY_TOKEN_DIR=\nREDIS_SIMPLY_SESSION_SECURE=false\n");
 
-        $overrides = Env::overrides($dir.'/.env', ['REDIS_ADMIN_HOST' => 'env-host']);
+        $overrides = Env::overrides($dir.'/.env', ['REDIS_SIMPLY_HOST' => 'env-host']);
         $config = Config::fromArray($dir, $overrides);
 
         self::assertSame('env-host', $config->get('redis.host'));
@@ -75,11 +75,11 @@ final class UnitTest extends TestCase
         $dir = self::tempDir();
 
         self::assertSame('/app', Env::home('/app', []));
-        self::assertSame('/app', Env::home('/app', ['REDIS_ADMIN_HOME' => ' ']));
-        self::assertSame(realpath($dir), Env::home('/app', ['REDIS_ADMIN_HOME' => $dir.'/']));
-        self::assertThrows(RuntimeException::class, fn () => Env::home('/app', ['REDIS_ADMIN_HOME' => $dir.'/missing']), 'not a directory');
+        self::assertSame('/app', Env::home('/app', ['REDIS_SIMPLY_HOME' => ' ']));
+        self::assertSame(realpath($dir), Env::home('/app', ['REDIS_SIMPLY_HOME' => $dir.'/']));
+        self::assertThrows(RuntimeException::class, fn () => Env::home('/app', ['REDIS_SIMPLY_HOME' => $dir.'/missing']), 'not a directory');
 
-        file_put_contents($dir.'/.env', "REDIS_ADMIN_TITLE=From home\n");
+        file_put_contents($dir.'/.env', "REDIS_SIMPLY_TITLE=From home\n");
         $config = Config::fromArray($dir, Env::overrides($dir.'/.env', []));
 
         self::assertSame('From home', $config->get('title'));
@@ -127,9 +127,9 @@ final class UnitTest extends TestCase
 
     public function testSocketPathIsBuiltFromTheTemplate(): void
     {
-        $connection = new Connection(Config::fromArray(__DIR__, ['redis' => ['socket' => '/run/redis-admin/{target}.sock']]));
+        $connection = new Connection(Config::fromArray(__DIR__, ['redis' => ['socket' => '/run/redis-simply/{target}.sock']]));
 
-        self::assertSame('/run/redis-admin/h7.sock', $connection->socketFor('h7'));
+        self::assertSame('/run/redis-simply/h7.sock', $connection->socketFor('h7'));
         self::assertThrows(UserError::class, fn () => $connection->socketFor('../h7'));
         self::assertSame(null, (new Connection(Config::fromArray(__DIR__, [])))->socketFor('h7'));
     }

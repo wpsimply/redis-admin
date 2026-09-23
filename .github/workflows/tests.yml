@@ -39,7 +39,7 @@ jobs:
       - name: Release archive builds
         run: |
           build/release.sh 0.0.0-ci /tmp/dist
-          unzip -l /tmp/dist/redis-admin-0.0.0-ci.zip
+          unzip -l /tmp/dist/redis-simply-0.0.0-ci.zip
 
   test:
     name: PHP ${{ matrix.php }} · ${{ matrix.server }}
@@ -88,5 +88,5 @@ jobs:
       - name: Integration tests
         run: php tests/run.php
         env:
-          REDIS_ADMIN_TEST_HOST: 127.0.0.1
-          REDIS_ADMIN_TEST_PORT: 6379
+          REDIS_SIMPLY_TEST_HOST: 127.0.0.1
+          REDIS_SIMPLY_TEST_PORT: 6379

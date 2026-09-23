@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
-use RedisAdmin\Transfer;
-use RedisAdmin\UserError;
+use RedisSimply\Transfer;
+use RedisSimply\UserError;
 
 final class TransferTest extends TestCase
 {
@@ -45,7 +45,7 @@ final class TransferTest extends TestCase
 
     public function testImportReportsBadEntriesAndKeepsGoing(): void
     {
-        $json = json_encode(['format' => 'redis-admin', 'version' => 1, 'keys' => [
+        $json = json_encode(['format' => 'redis-simply', 'version' => 1, 'keys' => [
             ['key' => 'good', 'type' => 'string', 'ttl' => -1, 'value' => 'v'],
             ['key' => 'bad', 'type' => 'hash', 'ttl' => -1, 'value' => [['only-one']]],
             ['key' => 'weird', 'type' => 'nope', 'ttl' => -1, 'value' => 'v'],
@@ -55,7 +55,7 @@ final class TransferTest extends TestCase
 
         self::assertSame(1, $result['imported']);
         self::assertSame(['bad', 'weird'], array_column($result['failed'], 'key'));
-        self::assertThrows(UserError::class, fn () => $this->transfer->import('{"hello": 1}', false), 'not a Redis Admin');
+        self::assertThrows(UserError::class, fn () => $this->transfer->import('{"hello": 1}', false), 'not a Redis Simply');
     }
 
     public function testRedisCliExportReplaysToTheSameData(): void

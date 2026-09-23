@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
 use Closure;
 use Redis;
-use RedisAdmin\Client;
-use RedisAdmin\Config;
+use RedisSimply\Client;
+use RedisSimply\Config;
 use RuntimeException;
 use Throwable;
 
@@ -70,8 +70,8 @@ abstract class TestCase
      */
     protected function redisTarget(): array
     {
-        $socket = getenv('REDIS_ADMIN_TEST_SOCKET') ?: null;
-        $host = getenv('REDIS_ADMIN_TEST_HOST') ?: null;
+        $socket = getenv('REDIS_SIMPLY_TEST_SOCKET') ?: null;
+        $host = getenv('REDIS_SIMPLY_TEST_HOST') ?: null;
 
         if ($socket === null && $host === null) {
             throw new Skipped('No test Redis configured.');
@@ -80,8 +80,8 @@ abstract class TestCase
         return [
             'socket' => $socket,
             'host' => $host ?? '127.0.0.1',
-            'port' => (int) (getenv('REDIS_ADMIN_TEST_PORT') ?: 6379),
-            'db' => (int) (getenv('REDIS_ADMIN_TEST_DB') ?: 15),
+            'port' => (int) (getenv('REDIS_SIMPLY_TEST_PORT') ?: 6379),
+            'db' => (int) (getenv('REDIS_SIMPLY_TEST_DB') ?: 15),
         ];
     }
 
@@ -115,7 +115,7 @@ abstract class TestCase
 
     protected static function tempDir(): string
     {
-        $dir = sys_get_temp_dir().'/redis-admin-test-'.bin2hex(random_bytes(4));
+        $dir = sys_get_temp_dir().'/redis-simply-test-'.bin2hex(random_bytes(4));
         mkdir($dir, 0700, true);
 
         return $dir;

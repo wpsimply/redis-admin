@@ -1,13 +1,13 @@
 {
-    "name": "wpsimply/redis-admin",
+    "name": "wpsimply/redis-simply",
     "description": "A small, self-hosted web UI for Redis and Valkey with one-time sign-on, built to sit next to a hosting control panel the way phpMyAdmin does.",
     "type": "project",
     "license": "MIT",
     "keywords": ["redis", "valkey", "admin", "gui", "sso"],
-    "homepage": "https://github.com/wpsimply/redis-admin",
+    "homepage": "https://github.com/wpsimply/redis-simply",
     "support": {
-        "issues": "https://github.com/wpsimply/redis-admin/issues",
-        "source": "https://github.com/wpsimply/redis-admin"
+        "issues": "https://github.com/wpsimply/redis-simply/issues",
+        "source": "https://github.com/wpsimply/redis-simply"
     },
     "require": {
         "php": ">=8.3",
@@ -18,7 +18,7 @@
     },
     "autoload": {
         "psr-4": {
-            "RedisAdmin\\": "src/"
+            "RedisSimply\\": "src/"
         }
     },
     "config": {

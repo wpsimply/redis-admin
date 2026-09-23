@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin\Tests;
+namespace RedisSimply\Tests;
 
-use RedisAdmin\Codec;
-use RedisAdmin\Formatter;
-use RedisAdmin\Keys;
-use RedisAdmin\UserError;
+use RedisSimply\Codec;
+use RedisSimply\Formatter;
+use RedisSimply\Keys;
+use RedisSimply\UserError;
 
 final class KeysTest extends TestCase
 {
@@ -193,7 +193,7 @@ final class KeysTest extends TestCase
 
     public function testWorksForARestrictedAclUserAndReportsWhatItMayNotDo(): void
     {
-        $user = 'redis-admin-test-'.bin2hex(random_bytes(4));
+        $user = 'redis-simply-test-'.bin2hex(random_bytes(4));
         $this->redis->rawCommand('ACL', 'SETUSER', $user, 'on', '>secret', '~*', '&*', '+@all', '-@admin', '-@dangerous', '-memory');
 
         try {
@@ -203,7 +203,7 @@ final class KeysTest extends TestCase
             $restricted->auth([$user, 'secret']);
             $restricted->select($target['db']);
 
-            $client = new \RedisAdmin\Client($restricted);
+            $client = new \RedisSimply\Client($restricted);
             $keys = new Keys($client, new Formatter);
 
             $keys->create('k', 'string', ['value' => 'v'], null);

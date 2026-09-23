@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * Everything the UI does to keys: listing, reading, creating, editing and
@@ -247,7 +247,7 @@ final class Keys
 
     public function deleteListItem(string $key, int $index, string $expectedHash): void
     {
-        $this->listScript($key, $index, $expectedHash, 'delete', 'redis-admin:tombstone:'.bin2hex(random_bytes(16)));
+        $this->listScript($key, $index, $expectedHash, 'delete', 'redis-simply:tombstone:'.bin2hex(random_bytes(16)));
     }
 
     /**

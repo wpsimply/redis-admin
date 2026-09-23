@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace RedisAdmin;
+namespace RedisSimply;
 
 /**
  * The application's configuration: the defaults below, overlaid with whatever
@@ -19,7 +19,7 @@ final class Config
      * Load the configuration for the application in the given directory.
      *
      * Three layers, each overriding the one before: the defaults below, the
-     * REDIS_ADMIN_* environment (.env, with the real environment winning), and
+     * REDIS_SIMPLY_* environment (.env, with the real environment winning), and
      * config.php. Use whichever suits the deployment; most need only one.
      */
     public static function load(string $root): self
@@ -85,13 +85,13 @@ final class Config
             ],
             'session' => [
                 'save_path' => $root.'/storage/sessions',
-                'name' => 'RedisAdminSession',
+                'name' => 'RedisSimplySession',
                 'secure' => true,
                 'idle_timeout' => 1800,
                 'lifetime' => 28800,
             ],
             'panel_url' => null,
-            'title' => 'Redis Admin',
+            'title' => 'Redis Simply',
             'limits' => [
                 'string_preview' => 262144,
                 'item_preview' => 65536,
