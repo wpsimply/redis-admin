@@ -53,26 +53,26 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         <div class="topbar-actions">
             <label class="db-select">
                 <span class="sr-only">Database</span>
-                <select x-model.number="db" @change="selectDb()">
+                <select x-model.number="db" @change="selectDb()" :disabled="busy">
                     <template x-for="database in databases" :key="database.db">
                         <option :value="database.db" x-text="'db' + database.db + (database.keys ? ' · ' + database.keys.toLocaleString() : '')"></option>
                     </template>
                 </select>
             </label>
-            <button type="button" class="button ghost" @click="openInfo()">Server</button>
-            <button type="button" class="button ghost" @click="openImport()">Import</button>
+            <button type="button" class="button ghost" @click="openInfo()" :disabled="busy">Server</button>
+            <button type="button" class="button ghost" @click="openImport()" :disabled="busy">Import</button>
             <form method="post" action="logout.php">
                 <input type="hidden" name="csrf" :value="csrf">
-                <button type="submit" class="button ghost">Sign out</button>
+                <button type="submit" class="button ghost" :disabled="busy">Sign out</button>
             </form>
         </div>
     </header>
 
     <main class="layout" :class="{ 'has-detail': current }">
         <aside class="sidebar">
-            <form class="search" @submit.prevent="search()">
+            <form class="search" @submit.prevent="submitSearch()">
                 <input type="search" x-ref="search" x-model="query" placeholder="Search keys, or a glob like user:*" aria-label="Search keys" autocomplete="off" spellcheck="false">
-                <select x-model="type" @change="search()" aria-label="Filter by type">
+                <select x-model="type" @change="submitSearch()" :disabled="busy" aria-label="Filter by type">
                     <option value="">All types</option>
                     <template x-for="option in types" :key="option">
                         <option :value="option" x-text="option"></option>
@@ -81,10 +81,10 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
             </form>
 
             <div class="toolbar">
-                <button type="button" class="button primary small" @click="openCreate()">New key</button>
-                <button type="button" class="button small" @click="search()" title="Reload">Refresh</button>
+                <button type="button" class="button primary small" @click="openCreate()" :disabled="busy">New key</button>
+                <button type="button" class="button small" @click="submitSearch()" :disabled="busy" :class="{ 'is-loading': loading }" title="Reload">Refresh</button>
                 <div class="menu" x-data="{ open: false }" @click.outside="open = false">
-                    <button type="button" class="button small" @click="open = !open">Bulk</button>
+                    <button type="button" class="button small" @click="open = !open" :disabled="busy">Bulk</button>
                     <div class="menu-items" x-show="open" x-transition.opacity @click="open = false">
                         <button type="button" @click="exportMatching('json')">Export matching (JSON)</button>
                         <button type="button" @click="exportMatching('redis')">Export matching (redis-cli)</button>
@@ -104,19 +104,20 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
 
             <div class="selection" x-show="selected.length" x-transition>
                 <span x-text="selected.length + ' selected'"></span>
-                <button type="button" class="link" @click="exportSelected('json')">Export</button>
-                <button type="button" class="link danger" @click="confirmDeleteSelected()">Delete</button>
+                <button type="button" class="link" @click="exportSelected('json')" :disabled="busy">Export</button>
+                <button type="button" class="link danger" @click="confirmDeleteSelected()" :disabled="busy">Delete</button>
                 <button type="button" class="link" @click="selected = []">Clear</button>
             </div>
 
-            <ul class="keys" role="listbox" aria-label="Keys">
+            <ul class="keys" role="listbox" aria-label="Keys" :aria-busy="loading ? 'true' : 'false'">
                 <template x-for="item in keys" :key="item.id">
                     <li :class="{ active: current && current.id === item.id }" role="option" :aria-selected="current && current.id === item.id">
                         <input type="checkbox" :value="item.id" x-model="selected" :aria-label="'Select ' + item.label">
-                        <button type="button" class="key-row" @click="open(item.id)">
+                        <button type="button" class="key-row" @click="open(item.id)" :disabled="busy">
                             <span class="badge" :class="'t-' + item.type" x-text="typeLabel(item.type)"></span>
                             <span class="key-name" x-text="item.label"></span>
-                            <span class="key-ttl" x-show="item.ttl >= 0" x-text="ttlShort(item.ttl)" :title="'Expires in ' + ttlLong(item.ttl)"></span>
+                            <span class="key-ttl" x-show="item.ttl >= 0 && keyLoading !== item.id" x-text="ttlShort(item.ttl)" :title="'Expires in ' + ttlLong(item.ttl)"></span>
+                            <span class="spinner small" x-show="keyLoading === item.id" aria-label="Loading"></span>
                         </button>
                     </li>
                 </template>
@@ -124,7 +125,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
 
             <div class="list-footer">
                 <p class="empty" x-show="!loading && keys.length === 0">No keys match.</p>
-                <button type="button" class="button small" x-show="cursor !== '0'" @click="loadMore()" :disabled="loading">Load more</button>
+                <button type="button" class="button small" x-show="cursor !== '0'" @click="loadMore()" :disabled="busy" :class="{ 'is-loading': loading }">Load more</button>
                 <span class="spinner" x-show="loading" aria-label="Loading"></span>
             </div>
         </aside>
@@ -132,13 +133,14 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         <section class="detail" aria-live="polite">
             <template x-if="!current">
                 <div class="placeholder">
-                    <p>Select a key to view it, or create a new one.</p>
-                    <p class="muted small">Press <kbd>/</kbd> to search, <kbd>n</kbd> for a new key.</p>
+                    <span class="spinner" x-show="keyLoading" aria-label="Loading"></span>
+                    <p x-show="!keyLoading">Select a key to view it, or create a new one.</p>
+                    <p class="muted small" x-show="!keyLoading">Press <kbd>/</kbd> to search, <kbd>n</kbd> for a new key.</p>
                 </div>
             </template>
 
             <template x-if="current">
-                <div class="key-detail">
+                <div class="key-detail" :class="{ 'is-loading': keyLoading === current.id }" :aria-busy="keyLoading === current.id ? 'true' : 'false'">
                     <div class="detail-head">
                         <button type="button" class="button ghost small back" @click="current = null">← Keys</button>
                         <h2 class="key-title" x-text="current.label"></h2>
@@ -150,11 +152,11 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                             <span x-text="current.ttl >= 0 ? 'Expires in ' + ttlLong(current.ttl) : 'No expiry'"></span>
                         </div>
                         <div class="detail-actions">
-                            <button type="button" class="button small" @click="reload()">Refresh</button>
-                            <button type="button" class="button small" @click="openRename()">Rename</button>
-                            <button type="button" class="button small" @click="openTtl()">TTL</button>
-                            <button type="button" class="button small" @click="exportIds([current.id], 'json')">Export</button>
-                            <button type="button" class="button small danger" @click="confirmDeleteCurrent()">Delete</button>
+                            <button type="button" class="button small" @click="! busy && reload()" :disabled="busy" :class="{ 'is-loading': keyLoading === current.id }">Refresh</button>
+                            <button type="button" class="button small" @click="openRename()" :disabled="busy">Rename</button>
+                            <button type="button" class="button small" @click="openTtl()" :disabled="busy">TTL</button>
+                            <button type="button" class="button small" @click="exportIds([current.id], 'json')" :disabled="busy">Export</button>
+                            <button type="button" class="button small danger" @click="confirmDeleteCurrent()" :disabled="busy">Delete</button>
                         </div>
                     </div>
 
@@ -177,7 +179,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                             <pre x-show="view === 'pretty'" class="editor pretty" x-text="current.pretty"></pre>
                             <div class="value-actions" x-show="view === 'edit' && !current.truncated">
                                 <button type="button" class="button small" x-show="current.format === 'json'" @click="formatDraftJson()">Format JSON</button>
-                                <button type="button" class="button primary" :disabled="!draftChanged()" @click="saveString()">Save</button>
+                                <button type="button" class="button primary" :disabled="busy || !draftChanged()" :class="{ 'is-loading': action === 'save' }" @click="saveString()">Save</button>
                             </div>
                         </div>
                     </template>
@@ -186,7 +188,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                     <template x-if="['hash', 'list', 'set', 'zset', 'stream'].includes(current.type)">
                         <div class="value">
                             <div class="value-bar">
-                                <button type="button" class="button small primary" @click="openItem(null)" x-text="current.type === 'list' ? 'Push value' : current.type === 'stream' ? 'Add entry' : 'Add ' + itemNoun()"></button>
+                                <button type="button" class="button small primary" @click="openItem(null)" :disabled="busy" x-text="current.type === 'list' ? 'Push value' : current.type === 'stream' ? 'Add entry' : 'Add ' + itemNoun()"></button>
                                 <span class="muted small" x-text="pageLabel()"></span>
                             </div>
                             <div class="table-wrap">
@@ -224,8 +226,8 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                                                     </template>
                                                 </td>
                                                 <td class="actions">
-                                                    <button type="button" class="link" x-show="current.type !== 'stream'" @click="openItem(item)" x-text="item.truncated ? 'View' : 'Edit'"></button>
-                                                    <button type="button" class="link danger" @click="confirmDeleteItem(item)">Delete</button>
+                                                    <button type="button" class="link" x-show="current.type !== 'stream'" @click="openItem(item)" :disabled="busy" x-text="item.truncated ? 'View' : 'Edit'"></button>
+                                                    <button type="button" class="link danger" @click="confirmDeleteItem(item)" :disabled="busy">Delete</button>
                                                 </td>
                                             </tr>
                                         </template>
@@ -234,8 +236,8 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                                 <p class="empty" x-show="current.items.length === 0">Nothing on this page.</p>
                             </div>
                             <div class="pager">
-                                <button type="button" class="button small" x-show="hasPrev()" @click="page(-1)">Previous</button>
-                                <button type="button" class="button small" x-show="hasNext()" @click="page(1)" x-text="usesCursor() ? 'Load more' : 'Next'"></button>
+                                <button type="button" class="button small" x-show="hasPrev()" @click="page(-1)" :disabled="busy">Previous</button>
+                                <button type="button" class="button small" x-show="hasNext()" @click="page(1)" :disabled="busy" x-text="usesCursor() ? 'Load more' : 'Next'"></button>
                             </div>
                         </div>
                     </template>
@@ -253,7 +255,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         <div class="modal" role="dialog" aria-modal="true" :aria-label="modalTitle" x-show="modal">
             <header>
                 <h3 x-text="modalTitle"></h3>
-                <button type="button" class="link" @click="closeModal()" aria-label="Close">✕</button>
+                <button type="button" class="link" @click="closeModal()" :disabled="action === 'confirm' || action === 'import'" aria-label="Close">✕</button>
             </header>
 
             <!-- Create key -->
@@ -269,7 +271,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                 <label x-show="form.type === 'zset'">Score <input type="text" inputmode="decimal" x-model="form.score"></label>
                 <label x-show="['string', 'hash', 'list', 'stream'].includes(form.type)">Value <textarea x-model="form.value" rows="6" spellcheck="false"></textarea></label>
                 <label>TTL in seconds <input type="number" min="1" x-model="form.ttl" placeholder="No expiry"></label>
-                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy">Create</button></footer>
+                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy" :class="{ 'is-loading': action === 'create' }">Create</button></footer>
             </form>
 
             <!-- Collection item -->
@@ -298,14 +300,14 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                     <input type="checkbox" x-model="form.base64" :disabled="form.readonly"> Value is base64 (binary)
                 </label>
                 <p class="notice" x-show="form.readonly">This value is truncated and is shown read-only.</p>
-                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" x-show="!form.readonly" :disabled="busy">Save</button></footer>
+                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" x-show="!form.readonly" :disabled="busy" :class="{ 'is-loading': action === 'item' }">Save</button></footer>
             </form>
 
             <!-- Rename -->
             <form x-show="modal === 'rename'" @submit.prevent="rename()">
                 <label>New name <input type="text" x-model="form.key" required spellcheck="false"></label>
                 <label class="check small"><input type="checkbox" x-model="form.overwrite"> Overwrite a key that already has this name</label>
-                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy">Rename</button></footer>
+                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy" :class="{ 'is-loading': action === 'rename' }">Rename</button></footer>
             </form>
 
             <!-- TTL -->
@@ -316,7 +318,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                         <button type="button" class="button small" @click="form.ttl = preset[1]" x-text="preset[0]"></button>
                     </template>
                 </div>
-                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy" x-text="form.ttl ? 'Set TTL' : 'Remove expiry'"></button></footer>
+                <footer><button type="button" class="button" @click="closeModal()">Cancel</button><button type="submit" class="button primary" :disabled="busy" :class="{ 'is-loading': action === 'ttl' }" x-text="form.ttl ? 'Set TTL' : 'Remove expiry'"></button></footer>
             </form>
 
             <!-- Confirm -->
@@ -327,15 +329,15 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                 </label>
                 <p class="progress" x-show="confirmation.progress" x-text="confirmation.progress"></p>
                 <footer>
-                    <button type="button" class="button" @click="closeModal()">Cancel</button>
-                    <button type="button" class="button danger-solid" :disabled="busy || (confirmation.phrase && form.phrase !== confirmation.phrase)" @click="runConfirmation()" x-text="confirmation.action || 'Delete'"></button>
+                    <button type="button" class="button" @click="closeModal()" :disabled="action === 'confirm'">Cancel</button>
+                    <button type="button" class="button danger-solid" :disabled="busy || (Boolean(confirmation.phrase) && form.phrase !== confirmation.phrase)" :class="{ 'is-loading': action === 'confirm' }" @click="runConfirmation()" x-text="confirmation.action || 'Delete'"></button>
                 </footer>
             </div>
 
             <!-- Import -->
             <form x-show="modal === 'import'" @submit.prevent="importFile()">
                 <p class="muted small">Import a JSON file exported by Redis Admin into <strong x-text="'db' + db"></strong>.</p>
-                <label>File <input type="file" x-ref="importFile" accept=".json,application/json" required></label>
+                <label>File <input type="file" x-ref="importFile" accept=".json,application/json" required :disabled="action === 'import'"></label>
                 <fieldset>
                     <legend>Keys that already exist</legend>
                     <label class="check small"><input type="radio" value="skip" x-model="form.mode"> Keep them (skip)</label>
@@ -349,11 +351,12 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
                         </template>
                     </ul>
                 </div>
-                <footer><button type="button" class="button" @click="closeModal()">Close</button><button type="submit" class="button primary" :disabled="busy">Import</button></footer>
+                <footer><button type="button" class="button" @click="closeModal()" :disabled="action === 'import'">Close</button><button type="submit" class="button primary" :disabled="busy" :class="{ 'is-loading': action === 'import' }">Import</button></footer>
             </form>
 
             <!-- Server info -->
-            <div x-show="modal === 'info'" class="info">
+            <div x-show="modal === 'info'" class="info" :aria-busy="infoLoading ? 'true' : 'false'">
+                <p class="loading-line" x-show="infoLoading"><span class="spinner small"></span> Loading server details…</p>
                 <p class="notice" x-show="info && !info.available">Server details are not available to this user. Key counts below may be incomplete.</p>
                 <dl class="info-grid" x-show="info && info.available">
                     <template x-for="row in infoRows()" :key="row[0]">

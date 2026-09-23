@@ -49,12 +49,30 @@ document.addEventListener('alpine:init', () => {
         modalTitle: '',
         form: {},
         confirmation: {},
-        busy: false,
         info: null,
+        infoLoading: false,
         importResult: null,
+
+        // Requests in flight, the user action running (by name, so its own
+        // button can show a spinner), and the key being opened. `keyRequest`
+        // numbers the key loads, so a response to an older click never lands
+        // over a newer one.
+        pending: 0,
+        action: null,
+        keyLoading: null,
+        keyRequest: 0,
 
         toasts: [],
         signedOut: false,
+
+        /**
+         * True while anything is in flight, or while an action made of several
+         * requests is between two of them. Every control that starts a request
+         * is disabled on it.
+         */
+        get busy() {
+            return this.pending > 0 || this.action !== null;
+        },
 
         async init() {
             try {
@@ -90,8 +108,22 @@ document.addEventListener('alpine:init', () => {
                     body: JSON.stringify(body),
                 };
 
-            const response = await fetch('api.php?' + params.toString(), { credentials: 'same-origin', ...options });
-            return this.unwrap(response);
+            return this.request('api.php?' + params.toString(), options);
+        },
+
+        /**
+         * Every request goes through here, so none can start or finish without
+         * the interface knowing.
+         */
+        async request(url, options = {}) {
+            this.pending++;
+
+            try {
+                const response = await fetch(url, { credentials: 'same-origin', ...options });
+                return await this.unwrap(response);
+            } finally {
+                this.pending--;
+            }
         },
 
         async unwrap(response) {
@@ -114,8 +146,23 @@ document.addEventListener('alpine:init', () => {
             return payload.data;
         },
 
-        async run(task, success = null) {
-            this.busy = true;
+        /**
+         * Run a task, reporting its failure as a toast.
+         *
+         * A guarded task is a user action: it is refused while anything else
+         * is running -- the disabled buttons say so, and this is what stops a
+         * keyboard submit getting past them -- and it holds `action` until it
+         * has finished, however many requests it makes. Unguarded tasks are the
+         * follow-ups an action makes of its own, such as reloading a key.
+         */
+        async run(task, { success = null, name = 'task', guard = true } = {}) {
+            if (guard && this.busy) {
+                return undefined;
+            }
+
+            if (guard) {
+                this.action = name;
+            }
 
             try {
                 const result = await task();
@@ -129,7 +176,9 @@ document.addEventListener('alpine:init', () => {
                 this.fail(error);
                 return undefined;
             } finally {
-                this.busy = false;
+                if (guard) {
+                    this.action = null;
+                }
             }
         },
 
@@ -143,6 +192,12 @@ document.addEventListener('alpine:init', () => {
             }
 
             return GLOB.test(text) ? text : '*' + text.replace(/\\/g, '\\\\') + '*';
+        },
+
+        submitSearch() {
+            if (!this.busy) {
+                this.search();
+            }
         },
 
         async search() {
@@ -210,11 +265,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         async refreshDatabases() {
+            this.infoLoading = true;
+
             try {
                 this.info = await this.api('info');
                 this.setDatabases(this.info.databases);
             } catch {
                 // The selector still works without counts.
+            } finally {
+                this.infoLoading = false;
             }
         },
 
@@ -223,13 +282,32 @@ document.addEventListener('alpine:init', () => {
                 await this.api('select-db', { body: { db: this.db } });
                 this.current = null;
                 await this.search();
-            });
+            }, { name: 'db' });
         },
 
         // ---- Key detail ----------------------------------------------------
 
-        async open(id, page = {}) {
-            const detail = await this.run(() => this.api('key', { query: { id, ...page } }));
+        async open(id, page = {}, { guard = true } = {}) {
+            if (guard && this.busy) {
+                return;
+            }
+
+            const request = ++this.keyRequest;
+            this.keyLoading = id;
+
+            let detail;
+
+            try {
+                detail = await this.run(() => this.api('key', { query: { id, ...page } }), { guard: false });
+            } finally {
+                if (request === this.keyRequest) {
+                    this.keyLoading = null;
+                }
+            }
+
+            if (request !== this.keyRequest) {
+                return;
+            }
 
             if (!detail) {
                 if (this.current && this.current.id === id) {
@@ -255,7 +333,7 @@ document.addEventListener('alpine:init', () => {
         reload() {
             if (this.current) {
                 const page = this.usesCursor() ? { cursor: this.itemCursor } : { offset: this.current.offset || 0 };
-                return this.open(this.current.id, page);
+                return this.open(this.current.id, page, { guard: false });
             }
 
             return undefined;
@@ -296,7 +374,7 @@ document.addEventListener('alpine:init', () => {
         async saveString() {
             const done = await this.run(
                 () => this.api('string.set', { body: { id: this.current.id, value: this.encodeInput(this.draft.text, this.draft.base64) } }),
-                'Saved.',
+                { success: 'Saved.', name: 'save' },
             );
 
             if (done) {
@@ -409,7 +487,7 @@ document.addEventListener('alpine:init', () => {
                     return;
             }
 
-            const done = await this.run(() => this.api(action, { body }), 'Saved.');
+            const done = await this.run(() => this.api(action, { body }), { success: 'Saved.', name: 'item' });
 
             if (done) {
                 this.closeModal();
@@ -432,7 +510,6 @@ document.addEventListener('alpine:init', () => {
                 message: `Delete this ${noun}?`,
                 run: async () => {
                     await this.api(request[0], { body: request[1] });
-                    this.closeModal();
                     this.notify(`Deleted the ${noun}.`);
                     await this.reload();
                 },
@@ -451,11 +528,11 @@ document.addEventListener('alpine:init', () => {
             const form = this.form;
             const result = await this.run(() => this.api('create', {
                 body: { key: form.key, type: form.type, field: form.field, member: form.member, score: form.score, value: form.value, ttl: form.ttl || null },
-            }), 'Key created.');
+            }), { success: 'Key created.', name: 'create' });
 
             if (result) {
                 this.closeModal();
-                await this.open(result.id);
+                await this.open(result.id, {}, { guard: false });
             }
         },
 
@@ -473,12 +550,15 @@ document.addEventListener('alpine:init', () => {
 
         async rename() {
             const oldId = this.current.id;
-            const result = await this.run(() => this.api('rename', { body: { id: oldId, newKey: this.form.key, overwrite: this.form.overwrite } }), 'Renamed.');
+            const result = await this.run(
+                () => this.api('rename', { body: { id: oldId, newKey: this.form.key, overwrite: this.form.overwrite } }),
+                { success: 'Renamed.', name: 'rename' },
+            );
 
             if (result) {
                 this.closeModal();
                 this.dropListed([oldId]);
-                await this.open(result.id);
+                await this.open(result.id, {}, { guard: false });
             }
         },
 
@@ -489,7 +569,10 @@ document.addEventListener('alpine:init', () => {
 
         async saveTtl() {
             const ttl = this.form.ttl === '' || this.form.ttl === null ? null : Number(this.form.ttl);
-            const done = await this.run(() => this.api('expire', { body: { id: this.current.id, ttl } }), ttl ? 'TTL set.' : 'Expiry removed.');
+            const done = await this.run(
+                () => this.api('expire', { body: { id: this.current.id, ttl } }),
+                { success: ttl ? 'TTL set.' : 'Expiry removed.', name: 'ttl' },
+            );
 
             if (done) {
                 this.closeModal();
@@ -503,7 +586,6 @@ document.addEventListener('alpine:init', () => {
                 message: `Delete the key “${label}”? This cannot be undone.`,
                 run: async () => {
                     await this.api('delete', { body: { ids: [id] } });
-                    this.closeModal();
                     this.dropListed([id]);
                     this.notify('Key deleted.');
                 },
@@ -516,7 +598,6 @@ document.addEventListener('alpine:init', () => {
                 message: `Delete ${ids.length.toLocaleString()} selected key${ids.length === 1 ? '' : 's'}? This cannot be undone.`,
                 run: async () => {
                     const result = await this.api('delete', { body: { ids } });
-                    this.closeModal();
                     this.dropListed(ids);
                     this.notify(`Deleted ${result.deleted.toLocaleString()} key${result.deleted === 1 ? '' : 's'}.`);
                 },
@@ -541,7 +622,6 @@ document.addEventListener('alpine:init', () => {
                         this.confirmation.progress = `${deleted.toLocaleString()} deleted so far…`;
                     } while (cursor !== '0');
 
-                    this.closeModal();
                     this.notify(`Deleted ${deleted.toLocaleString()} key${deleted === 1 ? '' : 's'}.`);
                     this.current = null;
                     await Promise.all([this.search(), this.refreshDatabases()]);
@@ -590,15 +670,11 @@ document.addEventListener('alpine:init', () => {
             data.append('file', file);
             data.append('mode', this.form.mode);
 
-            const result = await this.run(async () => {
-                const response = await fetch('import.php', {
-                    method: 'POST',
-                    credentials: 'same-origin',
-                    headers: { Accept: 'application/json', 'X-CSRF-Token': this.csrf },
-                    body: data,
-                });
-                return this.unwrap(response);
-            });
+            const result = await this.run(() => this.request('import.php', {
+                method: 'POST',
+                headers: { Accept: 'application/json', 'X-CSRF-Token': this.csrf },
+                body: data,
+            }), { name: 'import' });
 
             if (result) {
                 this.importResult = result;
@@ -646,8 +722,12 @@ document.addEventListener('alpine:init', () => {
             this.modalTitle = title;
         },
 
+        /**
+         * Close the open dialog, unless it is the one whose action is running:
+         * a confirmed delete or an import cannot be walked away from half way.
+         */
         closeModal() {
-            if (this.busy && this.modal === 'confirm') {
+            if ((this.action === 'confirm' && this.modal === 'confirm') || (this.action === 'import' && this.modal === 'import')) {
                 return;
             }
 
@@ -662,7 +742,15 @@ document.addEventListener('alpine:init', () => {
         },
 
         async runConfirmation() {
-            await this.run(() => this.confirmation.run());
+            const done = await this.run(async () => {
+                await this.confirmation.run();
+
+                return true;
+            }, { name: 'confirm' });
+
+            if (done) {
+                this.closeModal();
+            }
         },
 
         notify(message, kind = 'success') {
