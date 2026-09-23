@@ -14,8 +14,15 @@ $config = require dirname(__DIR__).'/bootstrap.php';
 redis_admin_headers();
 
 $session = new Session($config);
-$grant = $session->grant();
 $isPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST';
+
+try {
+    $grant = $session->grant(($isPost ? $_POST : $_GET)['db'] ?? null);
+} catch (UserError $e) {
+    http_response_code($e->status);
+    header('Content-Type: text/plain; charset=utf-8');
+    exit($e->getMessage());
+}
 
 if ($grant === null || ($isPost && ! $session->verifyCsrf($_POST['csrf'] ?? null))) {
     http_response_code($grant === null ? 401 : 419);

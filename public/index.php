@@ -43,7 +43,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         </div>
     </main>
 <?php } else { ?>
-<div class="app" x-data="redisAdmin" x-cloak @keydown.window="shortcut($event)">
+<div class="app" x-data="redisAdmin" x-cloak x-effect="syncUrl()" @keydown.window="shortcut($event)">
     <header class="topbar">
         <div class="brand">
             <img src="<?= $e($asset('assets/icon.svg')) ?>" alt="" width="22" height="22">
@@ -380,6 +380,7 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
         <input type="hidden" name="csrf" :value="csrf">
         <input type="hidden" name="ids">
         <input type="hidden" name="format">
+        <input type="hidden" name="db">
     </form>
 
     <div class="toasts" aria-live="assertive">

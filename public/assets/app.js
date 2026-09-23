@@ -33,6 +33,11 @@ document.addEventListener('alpine:init', () => {
 
         query: '',
         type: '',
+        // What the list is showing, as opposed to what is being typed: the URL
+        // records these, so a reload repeats the search that was last run.
+        appliedQuery: '',
+        appliedType: '',
+        urlReady: false,
         pattern: '*',
         keys: [],
         cursor: '0',
@@ -75,25 +80,132 @@ document.addEventListener('alpine:init', () => {
         },
 
         async init() {
+            const url = new URLSearchParams(window.location.search);
+
             try {
                 this.session = await this.api('session');
                 this.db = this.session.db;
                 this.setDatabases([]);
 
-                if (this.session.prefix) {
-                    this.query = this.session.prefix.replace(/[*?[\]\\]/g, '\\$&') + '*';
+                const db = Number.parseInt(url.get('db') ?? '', 10);
+
+                if (Number.isInteger(db) && db >= 0 && db < this.session.databases) {
+                    this.db = db;
+                }
+
+                // A search in the URL is a reload or a shared link, and wins
+                // over the key prefix the sign-on opened on.
+                this.query = url.has('q') ? url.get('q') : this.defaultQuery();
+
+                if (this.types.includes(url.get('type'))) {
+                    this.type = url.get('type');
                 }
 
                 await Promise.all([this.search(), this.refreshDatabases()]);
+                await this.restoreKey(url);
             } catch (error) {
                 this.fail(error);
+            } finally {
+                this.urlReady = true;
+            }
+        },
+
+        /**
+         * The search a fresh sign-on opens on: the key prefix it was issued
+         * for, if any, escaped so it is matched literally.
+         */
+        defaultQuery() {
+            return this.session.prefix ? this.session.prefix.replace(/[*?[\]\\]/g, '\\$&') + '*' : '';
+        },
+
+        /**
+         * Reopen the key the URL names, on the page and tab it was left on.
+         */
+        async restoreKey(url) {
+            const id = url.get('key');
+
+            if (!id || !/^[A-Za-z0-9_-]+$/.test(id)) {
+                return;
+            }
+
+            const page = {};
+            const offset = Number.parseInt(url.get('offset') ?? '', 10);
+            const cursor = url.get('cursor') ?? '';
+
+            if (Number.isInteger(offset) && offset > 0) {
+                page.offset = offset;
+            }
+
+            if (/^\d{1,20}$/.test(cursor) && cursor !== '0') {
+                page.cursor = cursor;
+            }
+
+            await this.open(id, page, { guard: false });
+
+            if (url.get('view') === 'pretty' && this.current && this.current.pretty) {
+                this.view = 'pretty';
+            }
+        },
+
+        /**
+         * Write what the page is showing into its URL, replacing the history
+         * entry rather than adding one, so a reload lands on the same page and
+         * Back still leaves Redis Admin instead of stepping through every click.
+         *
+         * Run from x-effect, so it re-runs whenever anything it reads changes.
+         * `urlReady` is read first: until the URL has been restored, writing it
+         * would overwrite the very state that is being restored.
+         */
+        syncUrl() {
+            if (!this.urlReady) {
+                return;
+            }
+
+            const params = new URLSearchParams();
+
+            // Only a search other than the one the sign-on opened on is worth
+            // recording -- an emptied search included, as `q=`, or a reload
+            // would put the sign-on's filter back.
+            if (this.appliedQuery !== this.defaultQuery()) {
+                params.set('q', this.appliedQuery);
+            }
+
+            if (this.appliedType !== '') {
+                params.set('type', this.appliedType);
+            }
+
+            if (this.db !== this.session.db) {
+                params.set('db', String(this.db));
+            }
+
+            if (this.current) {
+                params.set('key', this.current.id);
+
+                if (this.usesCursor() && this.itemCursor !== '0') {
+                    params.set('cursor', this.itemCursor);
+                } else if (!this.usesCursor() && (this.current.offset || 0) > 0) {
+                    params.set('offset', String(this.current.offset));
+                }
+
+                if (this.view === 'pretty') {
+                    params.set('view', 'pretty');
+                }
+            }
+
+            const search = params.toString();
+            const next = window.location.pathname + (search === '' ? '' : '?' + search);
+
+            if (next !== window.location.pathname + window.location.search) {
+                window.history.replaceState(window.history.state, '', next);
             }
         },
 
         // ---- API ---------------------------------------------------------
 
         async api(action, { query = {}, body = null } = {}) {
-            const params = new URLSearchParams({ action });
+            // The database travels with each request rather than living in the
+            // session, so every tab works in the one its own URL names.
+            const params = new URLSearchParams({ action, db: String(this.db) });
             Object.entries(query).forEach(([name, value]) => {
                 if (value !== null && value !== undefined && value !== '') {
                     params.set(name, value);
@@ -201,6 +313,8 @@ document.addEventListener('alpine:init', () => {
         },
 
         async search() {
+            this.appliedQuery = this.query.trim();
+            this.appliedType = this.type;
             this.pattern = this.buildPattern();
             this.cursor = '0';
             this.keys = [];
@@ -279,7 +393,6 @@ document.addEventListener('alpine:init', () => {
 
         async selectDb() {
             await this.run(async () => {
-                await this.api('select-db', { body: { db: this.db } });
                 this.current = null;
                 await this.search();
             }, { name: 'db' });
@@ -640,11 +753,12 @@ document.addEventListener('alpine:init', () => {
             form.elements.csrf.value = this.csrf;
             form.elements.ids.value = ids.join(',');
             form.elements.format.value = format;
+            form.elements.db.value = String(this.db);
             form.submit();
         },
 
         exportMatching(format) {
-            const params = new URLSearchParams({ pattern: this.pattern, format });
+            const params = new URLSearchParams({ pattern: this.pattern, format, db: String(this.db) });
 
             if (this.type) {
                 params.set('type', this.type);
@@ -669,6 +783,7 @@ document.addEventListener('alpine:init', () => {
             const data = new FormData();
             data.append('file', file);
             data.append('mode', this.form.mode);
+            data.append('db', String(this.db));
 
             const result = await this.run(() => this.request('import.php', {
                 method: 'POST',

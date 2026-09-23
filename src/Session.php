@@ -63,9 +63,14 @@ final class Session
     /**
      * The current grant, or null when signed out or timed out.
      *
+     * A request may name the database it works in. It applies to that request
+     * only and is never written back: the page's URL is what remembers which
+     * database a tab is on, so two tabs on two databases do not switch each
+     * other's. Without one, the database the sign-on opened is used.
+     *
      * @return array{target: string, user: ?string, password: ?string, db: int, prefix: ?string, label: string}|null
      */
-    public function grant(): ?array
+    public function grant(mixed $db = null): ?array
     {
         $this->start();
 
@@ -84,15 +89,27 @@ final class Session
 
         $_SESSION['seen_at'] = $now;
 
-        return $_SESSION['grant'];
+        $grant = $_SESSION['grant'];
+
+        if ($db !== null && $db !== '') {
+            $grant['db'] = $this->database($db);
+        }
+
+        return $grant;
     }
 
     /**
-     * Switch the database the session works in.
+     * Validate a database number against the configured count.
      */
-    public function selectDatabase(int $db): void
+    private function database(mixed $db): int
     {
-        $_SESSION['grant']['db'] = $db;
+        $databases = $this->config->int('redis.databases');
+
+        if (! is_numeric($db) || (string) (int) $db !== (string) $db || (int) $db < 0 || (int) $db >= $databases) {
+            throw new UserError(sprintf('Unknown database. Use 0 to %d.', $databases - 1));
+        }
+
+        return (int) $db;
     }
 
     public function csrf(): string

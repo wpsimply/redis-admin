@@ -9,13 +9,20 @@ namespace RedisAdmin;
  *
  * Reads are GET, changes are POST with a JSON body and the session's CSRF
  * token in the X-CSRF-Token header. Every action runs against the instance the
- * session was signed in to, and only that one.
+ * session was signed in to, and only that one, in the database the `db`
+ * query parameter names.
  */
 final class Api
 {
     private const array READS = ['session', 'info', 'scan', 'key'];
 
-    private ?Client $client = null;
+    /**
+     * Connections opened so far, by database: the connection selects the
+     * database once, when it is opened.
+     *
+     * @var array<int, Client>
+     */
+    private array $clients = [];
 
     public function __construct(
         private readonly Config $config,
@@ -30,7 +37,7 @@ final class Api
      */
     public function handle(string $method, string $action, array $query, array $body, ?string $csrfToken = null): array
     {
-        $grant = $this->session->grant();
+        $grant = $this->session->grant($query['db'] ?? null);
 
         if ($grant === null) {
             throw new UserError('Your session has ended. Open Redis Admin again from your control panel.', 401);
@@ -52,17 +59,6 @@ final class Api
             }
         }
 
-        if ($action === 'select-db') {
-            $db = (int) ($body['db'] ?? 0);
-
-            if ($db < 0 || $db >= $this->config->int('redis.databases')) {
-                throw new UserError('Unknown database.');
-            }
-
-            $this->session->selectDatabase($db);
-            $grant['db'] = $db;
-        }
-
         $this->session->release();
 
         return match ($action) {
@@ -79,7 +75,6 @@ final class Api
                 'offset' => (int) ($query['offset'] ?? 0),
                 'count' => (int) ($query['count'] ?? 100),
             ]),
-            'select-db' => $this->sessionPayload($grant),
             default => $this->mutate($grant, $action, $body),
         };
     }
@@ -214,7 +209,7 @@ final class Api
      */
     public function client(array $grant): Client
     {
-        return $this->client ??= new Client($this->connection->open($grant));
+        return $this->clients[$grant['db']] ??= new Client($this->connection->open($grant));
     }
 
     /**

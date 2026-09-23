@@ -80,6 +80,37 @@ final class ApiTest extends TestCase
         self::assertSame(null, $this->session->grant());
     }
 
+    public function testARequestWorksInTheDatabaseItNamesWithoutSwitchingTheSession(): void
+    {
+        $target = $this->redisTarget();
+        $other = $target['db'] === 14 ? 13 : 14;
+
+        $this->redis->select($other);
+        $this->redis->flushDB();
+        $this->redis->set('elsewhere', '1');
+        $this->redis->select($target['db']);
+        $this->redis->set('here', '1');
+
+        try {
+            $named = $this->api->handle('GET', 'scan', ['pattern' => '*', 'db' => (string) $other], []);
+            $default = $this->api->handle('GET', 'scan', ['pattern' => '*'], []);
+
+            self::assertSame(['elsewhere'], array_column($named['keys'], 'label'));
+            self::assertSame(['here'], array_column($default['keys'], 'label'), 'The named database is not remembered.');
+        } finally {
+            $this->redis->select($other);
+            $this->redis->flushDB();
+            $this->redis->select($target['db']);
+        }
+    }
+
+    public function testAnUnknownDatabaseIsRejected(): void
+    {
+        foreach (['16', '-1', '1.5', 'abc'] as $db) {
+            self::assertThrows(UserError::class, fn () => $this->api->handle('GET', 'scan', ['db' => $db], []), 'Unknown database');
+        }
+    }
+
     public function testScanRunsAgainstTheGrantedDatabaseOnly(): void
     {
         $this->redis->set('mine', '1');

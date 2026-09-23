@@ -8,6 +8,7 @@ A small, self-hosted web UI for Redis and Valkey, built to sit next to a hosting
 - Rename, set or remove TTLs, delete one key, a selection, or everything matching a pattern
 - Export to JSON (re-importable) or a `redis-cli` script; import JSON, skipping or replacing existing keys
 - Server overview: memory, hit rate, evictions, keys per database
+- The URL records the search, type filter, database, open key and its page, so a reload lands on the same view, and every tab can work in a database of its own
 - No build step, no runtime dependencies: plain PHP 8.3+, phpredis, and a vendored copy of Alpine.js
 
 ## Requirements

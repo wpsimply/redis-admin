@@ -14,9 +14,10 @@ redis_admin_headers();
 header('Content-Type: application/json; charset=utf-8');
 
 $session = new Session($config);
-$grant = $session->grant();
 
 try {
+    $grant = $session->grant($_POST['db'] ?? null);
+
     if ($grant === null) {
         throw new UserError('Your session has ended. Open Redis Admin again from your control panel.', 401);
     }
