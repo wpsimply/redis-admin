@@ -1,0 +1,10 @@
+/vendor/
+/.env
+/config.php
+/storage/sessions/*
+/storage/sso-tokens/*
+!/storage/sessions/.gitignore
+!/storage/sso-tokens/.gitignore
+.DS_Store
+.idea/
+.vscode/

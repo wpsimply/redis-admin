@@ -1,0 +1,24 @@
+{
+    "name": "wpsimply/redis-admin",
+    "description": "A small, self-hosted web UI for Redis and Valkey with one-time sign-on, built to sit next to a hosting control panel the way phpMyAdmin does.",
+    "type": "project",
+    "license": "MIT",
+    "keywords": ["redis", "valkey", "admin", "gui", "sso"],
+    "require": {
+        "php": ">=8.3",
+        "ext-json": "*",
+        "ext-mbstring": "*",
+        "ext-redis": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "RedisAdmin\\": "src/"
+        }
+    },
+    "scripts": {
+        "test": "@php tests/run.php",
+        "post-create-project-cmd": [
+            "@php -r \"file_exists('.env') || copy('.env.example', '.env');\""
+        ]
+    }
+}
