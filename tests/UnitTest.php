@@ -9,6 +9,8 @@ use RedisSimply\Config;
 use RedisSimply\Connection;
 use RedisSimply\Env;
 use RedisSimply\Formatter;
+use RedisSimply\Serialized;
+use RedisSimply\Session;
 use RedisSimply\TokenStore;
 use RedisSimply\Transfer;
 use RedisSimply\UserError;
@@ -100,6 +102,86 @@ final class UnitTest extends TestCase
         self::assertSame([], glob($dir.'/*'));
     }
 
+    public function testABoundTokenIsSpentOnlyByTheBrowserHoldingItsProof(): void
+    {
+        $dir = self::tempDir();
+        $proof = bin2hex(random_bytes(32));
+        $issue = static function (array $payload) use ($dir): string {
+            $token = bin2hex(random_bytes(32));
+            file_put_contents($dir.'/'.$token, json_encode(['target' => 'h42', ...$payload]));
+
+            return $token;
+        };
+
+        $store = new TokenStore($dir, 60);
+
+        self::assertSame('h42', $store->consume($issue(['binding' => TokenStore::binding($proof)]), $proof)['target']);
+
+        // Someone else's link, opened in a browser without the proof, or with another one.
+        $foreign = $issue(['binding' => TokenStore::binding($proof)]);
+        self::assertThrows(UserError::class, fn () => $store->consume($foreign), 'another browser');
+        self::assertThrows(UserError::class, fn () => $store->consume($foreign, $proof), 'already been used');
+        self::assertThrows(UserError::class, fn () => $store->consume($issue(['binding' => TokenStore::binding($proof)]), bin2hex(random_bytes(32))), 'another browser');
+        self::assertThrows(UserError::class, fn () => $store->consume($issue(['binding' => ['x']]), $proof), 'another browser');
+
+        // Unbound tokens work until binding is required.
+        self::assertSame('h42', $store->consume($issue([]))['target']);
+        self::assertThrows(UserError::class, fn () => (new TokenStore($dir, 60, true))->consume($issue([]), $proof), 'not issued to a browser');
+        self::assertSame([], glob($dir.'/*'));
+    }
+
+    public function testSessionKeepsThePasswordEncryptedUnderTheCookieKey(): void
+    {
+        $dir = self::tempDir();
+        $session = new Session(Config::fromArray($dir, ['session' => ['save_path' => $dir, 'secure' => false]]));
+
+        $session->signIn(['target' => 'h42', 'user' => 'panel', 'password' => 'hunter2', 'db' => 3, 'prefix' => null, 'label' => 'Acme']);
+
+        self::assertSame(null, $_SESSION['grant']['password']);
+        self::assertTrue(! str_contains(serialize($_SESSION), 'hunter2'), 'The password must not be stored in the session in the clear.');
+        self::assertSame('hunter2', $session->grant()['password'] ?? null);
+        self::assertSame(5, $session->grant('5')['db'] ?? null);
+        self::assertThrows(UserError::class, fn () => $session->grant('99'), 'Unknown database');
+
+        // Without the key cookie, the session is worthless.
+        unset($_COOKIE['RedisSimplySessionKey']);
+        self::assertSame(null, $session->grant());
+
+        session_write_close();
+    }
+
+    public function testSecureSessionCookiesCannotBeSetFromASiblingSubdomain(): void
+    {
+        $dir = self::tempDir();
+        $session = new Session(Config::fromArray($dir, ['session' => ['save_path' => $dir, 'secure' => true]]));
+
+        $session->signIn(['target' => 'h42', 'user' => null, 'password' => 'hunter2', 'db' => 0, 'prefix' => null, 'label' => 'Acme']);
+
+        self::assertSame('__Host-RedisSimplySession', session_name());
+        self::assertTrue(isset($_COOKIE['__Host-RedisSimplySessionKey']));
+        self::assertSame('', session_get_cookie_params()['domain']);
+
+        session_write_close();
+        session_name('RedisSimplySession');
+    }
+
+    public function testSignOnStartsWithAProofOnlyThisBrowserHolds(): void
+    {
+        $dir = self::tempDir();
+        $session = new Session(Config::fromArray($dir, ['session' => ['save_path' => $dir, 'secure' => false]]));
+
+        self::assertSame(null, $session->signOnProof());
+
+        $binding = $session->startSignOn();
+        $proof = $session->signOnProof();
+
+        self::assertTrue($proof !== null && TokenStore::binding($proof) === $binding);
+
+        $_COOKIE['RedisSimplySessionSignOn'] = 'not a proof';
+        self::assertSame(null, $session->signOnProof());
+        unset($_COOKIE['RedisSimplySessionSignOn']);
+    }
+
     public function testExpiredTokenIsRejectedAndRemoved(): void
     {
         $dir = self::tempDir();
@@ -155,6 +237,18 @@ final class UnitTest extends TestCase
 
         self::assertSame('serialized', $described['format']);
         self::assertTrue(str_contains((string) $described['pretty'], '"id": 7') && str_contains((string) $described['pretty'], '"name": "x"'));
+    }
+
+    public function testSerializedValuesAreReadWithoutUnserialize(): void
+    {
+        self::assertSame([false], Serialized::decode('b:0;'));
+        self::assertSame([null], Serialized::decode('N;'));
+        self::assertSame([['a', '(reference to value 2)']], Serialized::decode('a:2:{i:0;s:1:"a";i:1;R:2;}'));
+        self::assertSame([['__class' => 'Legacy', '__data' => 'x:1']], Serialized::decode('C:6:"Legacy":3:{x:1}'));
+
+        self::assertSame(null, Serialized::decode('s:5:"abc";'), 'A wrong length is not serialized data.');
+        self::assertSame(null, Serialized::decode('a:1:{i:0;N;}trailing'));
+        self::assertSame(null, Serialized::decode(str_repeat('a:1:{i:0;', 100).'N;'.str_repeat('}', 100)), 'Nesting is limited.');
     }
 
     public function testRedisCliLinesEscapeEveryByte(): void

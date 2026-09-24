@@ -10,7 +10,7 @@ if (PHP_VERSION_ID < 80300) {
     exit('Redis Simply requires PHP 8.3 or newer.');
 }
 
-foreach (['redis' => 'phpredis (php-redis)', 'mbstring' => 'mbstring', 'session' => 'session'] as $extension => $name) {
+foreach (['redis' => 'phpredis (php-redis)', 'mbstring' => 'mbstring', 'session' => 'session', 'sodium' => 'sodium'] as $extension => $name) {
     if (! extension_loaded($extension)) {
         http_response_code(500);
         exit("Redis Simply requires the {$name} extension.");

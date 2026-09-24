@@ -13,7 +13,7 @@ A small, self-hosted web UI for Redis and Valkey, built to sit next to a hosting
 
 ## Requirements
 
-- PHP 8.3 or newer with the `redis` (phpredis), `mbstring` and `session` extensions
+- PHP 8.3 or newer with the `redis` (phpredis), `mbstring`, `session` and `sodium` extensions
 - Redis 6.2+ or Valkey 7+
 - A web server that serves only the `public/` directory
 
@@ -90,6 +90,8 @@ Most installs only need `.env`. The settings that matter:
 | `REDIS_SIMPLY_HOST`, `REDIS_SIMPLY_PORT` | Used when no socket is set. |
 | `REDIS_SIMPLY_TOKEN_DIR` | Where the control panel drops sign-on tokens. Defaults to `storage/sso-tokens`. |
 | `REDIS_SIMPLY_TOKEN_TTL` | Seconds a token stays valid. Default 60. |
+| `REDIS_SIMPLY_SSO_ISSUE_URL` | The panel page `sso.php?start` sends the browser to, for a token bound to it. See below. |
+| `REDIS_SIMPLY_SSO_REQUIRE_BINDING` | `true` refuses tokens that are not bound to a browser. Default `false`. |
 | `REDIS_SIMPLY_PANEL_URL` | Linked from the signed-out page. |
 | `REDIS_SIMPLY_SESSION_SECURE` | Keep `true` in production; `false` only for local HTTP. |
 
@@ -97,42 +99,53 @@ See [`.env.example`](.env.example) for all of them.
 
 ## Signing users in
 
-There is no login form. Your control panel authorises the user, writes a token file and redirects them:
+There is no login form. Your control panel authorises the user, writes a token file and redirects them. Each token is bound to the browser that asked for it, so a link can only be used by the person it was issued to:
 
-1. Generate a random token: 32–64 bytes, hex-encoded.
-2. Write `<token-dir>/<token>` containing JSON, readable by the PHP-FPM pool:
+1. The panel's "Open Redis" button sends the browser to `https://redis.example.com/sso.php?start`, with any parameters the panel needs to know which account is meant (`&account=42`).
+2. Redis Simply gives the browser a random proof in a cookie and sends it on to `REDIS_SIMPLY_SSO_ISSUE_URL` with those parameters and `binding=<hash of the proof>`.
+3. The panel checks that the user is signed in to the panel and that the account is theirs, then writes a token:
+   1. Generate a random token: 32–64 bytes, hex-encoded.
+   2. Write `<token-dir>/<token>` containing JSON, readable by the PHP-FPM pool:
 
-   ```json
-   {
-     "target": "h42",
-     "user": "panel",
-     "password": "…",
-     "db": 0,
-     "prefix": "wp_abc:",
-     "label": "example.com"
-   }
-   ```
+      ```json
+      {
+        "target": "h42",
+        "user": "panel",
+        "password": "…",
+        "db": 0,
+        "prefix": "wp_abc:",
+        "label": "example.com",
+        "binding": "<the binding it was sent>"
+      }
+      ```
 
-   | Field | |
-   | --- | --- |
-   | `target` | Required. `[A-Za-z0-9_-]{1,64}`. Substituted into `REDIS_SIMPLY_SOCKET`. |
-   | `user`, `password` | Redis ACL credentials. Omit `user` to authenticate with a password only. |
-   | `db` | Database to open. |
-   | `prefix` | Optional: open the key list filtered to keys starting with this. |
-   | `label` | Shown in the header. |
+      | Field | |
+      | --- | --- |
+      | `target` | Required. `[A-Za-z0-9_-]{1,64}`. Substituted into `REDIS_SIMPLY_SOCKET`. |
+      | `user`, `password` | Redis ACL credentials. Omit `user` to authenticate with a password only. |
+      | `db` | Database to open. |
+      | `prefix` | Optional: open the key list filtered to keys starting with this. It is a starting filter, not a limit: see the security notes. |
+      | `label` | Shown in the header. |
+      | `binding` | The `binding` parameter, exactly as received. The token is then spent only by the browser holding the proof. |
 
-3. Redirect the user to `https://redis.example.com/sso.php?token=<token>`.
+4. The panel redirects the browser to `https://redis.example.com/sso.php?token=<token>`. Never show the link or let it be copied.
 
-The token is spent on first use and expires after `REDIS_SIMPLY_TOKEN_TTL` seconds either way. The connection details stay in the server-side session. Nothing the browser sends can change which instance or socket a request uses.
+The token is spent on first use, whoever opens it, and expires after `REDIS_SIMPLY_TOKEN_TTL` seconds either way. The connection details stay in the server-side session. Nothing the browser sends can change which instance or socket a request uses.
 
-[`examples/issue-token.php`](examples/issue-token.php) shows the panel side.
+Without the binding, anyone given a link can open it, and whoever issued it can sign someone else into their own instance. A token without `binding` is still accepted, so a panel can move to bound tokens at its own pace; once it binds every token, set `REDIS_SIMPLY_SSO_REQUIRE_BINDING=true` to refuse any that are not.
+
+[`examples/issue-token.php`](examples/issue-token.php) shows the panel side. If it is reached without a `binding`, it sends the browser to `sso.php?start` first, so the panel's existing button can keep pointing at it.
 
 ## Security notes
 
 - **Scope the Redis user.** The app never exposes a raw command console. Even so, give it an ACL user that cannot reconfigure the server, for example:
   `ACL SETUSER panel on >secret ~* &* +@all -@admin -@dangerous +info`
   That user can do everything this app does, but can't run `CONFIG`, `ACL`, `FLUSHALL`, `KEYS`, `DEBUG` or `SHUTDOWN`. Leave out `+info` and the server overview is hidden; the key browser works either way.
-- Tokens are single-use, short-lived and never logged by the app. Pages are sent with `Referrer-Policy: no-referrer`, so the token URL doesn't leak to other sites.
+- **Give each account an instance of its own, or an ACL user of its own.** With `REDIS_SIMPLY_SOCKET`, each token's `target` picks an instance, and a session reaches that one only. Without it, every session connects to the same `REDIS_SIMPLY_HOST`, and the ACL user in the token is all that keeps accounts apart: give each account its own user limited to its own keys (`~acct42:*` rather than `~*`). A session can switch to any database number on its instance, and `prefix` only filters the key list it opens on, so neither separates accounts.
+- The password is kept in the server-side session encrypted, under a key held only in a cookie of its own. The session file alone does not reveal it.
+- Over HTTPS the session cookies carry the `__Host-` prefix and no domain, so a site on a sibling subdomain (another account's, on a shared server) cannot plant a session in the user's browser.
+- Nothing read from Redis is ever passed to `unserialize()`. Serialized PHP values are shown by reading the format itself, so nothing in them is instantiated.
+- Tokens are single-use, short-lived, bound to the browser that asked for them, and never logged by the app. Pages are sent with `Referrer-Policy: no-referrer`, so the token URL doesn't leak to other sites.
 - Every change needs the session's CSRF token. Sessions end after `REDIS_SIMPLY_SESSION_IDLE_TIMEOUT` seconds of inactivity, or after `REDIS_SIMPLY_SESSION_LIFETIME` seconds regardless of activity.
 - The Content-Security-Policy allows scripts only from this origin. Alpine.js needs `'unsafe-eval'` to evaluate its directives. No directive is ever built from Redis data, and values are only ever rendered as text.
 

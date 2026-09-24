@@ -34,6 +34,8 @@ final class Env
         'REDIS_SIMPLY_DATABASES' => ['redis.databases', 'int'],
         'REDIS_SIMPLY_TOKEN_DIR' => ['sso.token_dir', 'string'],
         'REDIS_SIMPLY_TOKEN_TTL' => ['sso.token_ttl', 'int'],
+        'REDIS_SIMPLY_SSO_ISSUE_URL' => ['sso.issue_url', 'string'],
+        'REDIS_SIMPLY_SSO_REQUIRE_BINDING' => ['sso.require_binding', 'bool'],
         'REDIS_SIMPLY_SESSION_PATH' => ['session.save_path', 'string'],
         'REDIS_SIMPLY_SESSION_NAME' => ['session.name', 'string'],
         'REDIS_SIMPLY_SESSION_SECURE' => ['session.secure', 'bool'],

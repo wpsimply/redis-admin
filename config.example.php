@@ -32,6 +32,11 @@ return [
     'sso' => [
         'token_dir' => __DIR__.'/storage/sso-tokens',
         'token_ttl' => 60,
+        // The panel page that issues a token bound to the browser:
+        // sso.php?start sends the browser there with ?binding=<hash>.
+        'issue_url' => null,
+        // Once the panel binds every token, refuse any token that is not.
+        'require_binding' => false,
     ],
 
     'session' => [

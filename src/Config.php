@@ -82,6 +82,10 @@ final class Config
             'sso' => [
                 'token_dir' => $root.'/storage/sso-tokens',
                 'token_ttl' => 60,
+                // Where sso.php?start sends the browser for a bound token.
+                'issue_url' => null,
+                // Refuse tokens that are not bound to a browser.
+                'require_binding' => false,
             ],
             'session' => [
                 'save_path' => $root.'/storage/sessions',

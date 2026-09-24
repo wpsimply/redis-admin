@@ -14,7 +14,8 @@
         "ext-json": "*",
         "ext-mbstring": "*",
         "ext-redis": "*",
-        "ext-session": "*"
+        "ext-session": "*",
+        "ext-sodium": "*"
     },
     "autoload": {
         "psr-4": {

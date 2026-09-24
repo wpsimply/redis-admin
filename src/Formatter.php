@@ -22,7 +22,7 @@ final class Formatter
         // Checked before the binary test: an object with private or protected
         // properties serializes their names with NUL bytes, and WordPress's
         // object cache is full of them.
-        if ($complete && $this->decodeSerialized && ($pretty = $this->unserialize($bytes)) !== null) {
+        if ($complete && $this->decodeSerialized && ($pretty = $this->serialized($bytes)) !== null) {
             return ['format' => 'serialized', 'pretty' => $pretty];
         }
 
@@ -47,70 +47,21 @@ final class Formatter
     }
 
     /**
-     * Decode a PHP-serialized value for display, never instantiating a class.
+     * Decode a PHP-serialized value for display. It is read by
+     * {@see Serialized}, never by unserialize(): values come from Redis, and
+     * nothing in them is instantiated or trusted.
      */
-    private function unserialize(string $bytes): ?string
+    private function serialized(string $bytes): ?string
     {
-        if (preg_match('/^(?:[aOCE]:\d+:|s:\d+:"|i:-?\d+;|d:|b:[01];|N;)/', $bytes) !== 1) {
-            return null;
-        }
+        $decoded = Serialized::decode($bytes);
 
-        $value = @unserialize($bytes, ['allowed_classes' => false, 'max_depth' => 64]);
-
-        if ($value === false && $bytes !== 'b:0;') {
+        if ($decoded === null) {
             return null;
         }
 
         return json_encode(
-            $this->normalize($value),
+            $decoded[0],
             JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE | JSON_PRESERVE_ZERO_FRACTION,
         ) ?: null;
-    }
-
-    /**
-     * Reduce an unserialized value to something JSON can show: objects become
-     * arrays tagged with their class, private and protected property names
-     * lose their mangling, and binary strings are escaped.
-     */
-    private function normalize(mixed $value, int $depth = 0): mixed
-    {
-        if ($depth > 64) {
-            return '…';
-        }
-
-        if (is_string($value)) {
-            return Codec::display($value);
-        }
-
-        if (is_float($value) && ! is_finite($value)) {
-            return (string) $value;
-        }
-
-        if (is_object($value)) {
-            $properties = (array) $value;
-            $class = $properties['__PHP_Incomplete_Class_Name'] ?? $value::class;
-            unset($properties['__PHP_Incomplete_Class_Name']);
-
-            $normalized = ['__class' => $class];
-
-            foreach ($properties as $name => $property) {
-                $clean = str_contains((string) $name, "\0") ? substr((string) $name, strrpos((string) $name, "\0") + 1) : (string) $name;
-                $normalized[$clean] = $this->normalize($property, $depth + 1);
-            }
-
-            return $normalized;
-        }
-
-        if (is_array($value)) {
-            $normalized = [];
-
-            foreach ($value as $key => $item) {
-                $normalized[is_string($key) ? Codec::display($key) : $key] = $this->normalize($item, $depth + 1);
-            }
-
-            return $normalized;
-        }
-
-        return $value;
     }
 }
