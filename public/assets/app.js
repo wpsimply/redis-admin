@@ -969,4 +969,65 @@ document.addEventListener('alpine:init', () => {
             return parts.slice(0, 2).join(' ');
         },
     }));
+
+    // The database crumb in the top bar; reads databases and db from redisSimply.
+    Alpine.data('dbPicker', () => ({
+        open: false,
+        query: '',
+        active: 0,
+
+        matches() {
+            const query = this.query.trim().toLowerCase().replace(/^db/, '');
+            return query ? this.databases.filter((database) => String(database.db).startsWith(query)) : this.databases;
+        },
+
+        toggle() {
+            if (this.open) {
+                this.close();
+                return;
+            }
+
+            this.query = '';
+            this.active = Math.max(0, this.databases.findIndex((database) => database.db === this.db));
+            this.open = true;
+            this.$nextTick(() => {
+                this.$refs.filter.focus();
+                this.scrollToActive();
+            });
+        },
+
+        close(refocus = false) {
+            this.open = false;
+
+            if (refocus) {
+                this.$refs.trigger.focus();
+            }
+        },
+
+        move(step) {
+            const count = this.matches().length;
+
+            if (count > 0) {
+                this.active = (this.active + step + count) % count;
+                this.$nextTick(() => this.scrollToActive());
+            }
+        },
+
+        scrollToActive() {
+            this.$refs.list.children[this.active]?.scrollIntoView({ block: 'nearest' });
+        },
+
+        choose(database) {
+            if (!database) {
+                return;
+            }
+
+            this.close(true);
+
+            if (database.db !== this.db) {
+                this.db = database.db;
+                this.selectDb();
+            }
+        },
+    }));
 });

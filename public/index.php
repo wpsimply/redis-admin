@@ -49,16 +49,28 @@ $asset = static fn (string $path): string => $path.'?v='.rawurlencode($version);
             <img src="<?= $e($asset('assets/icon.svg')) ?>" alt="" width="22" height="22">
             <strong><?= $e($title) ?></strong>
             <span class="target" x-text="session.label"></span>
+            <div class="menu db-picker" x-data="dbPicker" @click.outside="close()" @keydown.escape.stop="close(true)" x-show="databases.length">
+                <button type="button" class="db-crumb" x-ref="trigger" @click="toggle()" :disabled="busy" aria-haspopup="listbox" :aria-expanded="open ? 'true' : 'false'" title="Change database">
+                    <span x-text="'db' + db"></span>
+                    <span class="caret" aria-hidden="true">▾</span>
+                </button>
+                <div class="menu-items db-menu" x-show="open" x-transition.opacity>
+                    <input type="search" x-ref="filter" x-model="query" @input="active = 0" @keydown.down.prevent="move(1)" @keydown.up.prevent="move(-1)" @keydown.enter.prevent="choose(matches()[active])"
+                        placeholder="Filter databases" aria-label="Filter databases" autocomplete="off" spellcheck="false">
+                    <ul role="listbox" x-ref="list" aria-label="Databases">
+                        <template x-for="(database, i) in matches()" :key="database.db">
+                            <li role="option" :aria-selected="database.db === db ? 'true' : 'false'" :class="{ active: i === active, current: database.db === db }"
+                                @click="choose(database)" @mousemove="active = i">
+                                <span x-text="'db' + database.db"></span>
+                                <span class="db-keys" x-text="database.keys ? database.keys.toLocaleString() + ' keys' : 'empty'"></span>
+                            </li>
+                        </template>
+                    </ul>
+                    <p class="empty" x-show="matches().length === 0">No databases match.</p>
+                </div>
+            </div>
         </div>
         <div class="topbar-actions">
-            <label class="db-select">
-                <span class="sr-only">Database</span>
-                <select x-model.number="db" @change="selectDb()" :disabled="busy">
-                    <template x-for="database in databases" :key="database.db">
-                        <option :value="database.db" x-text="'db' + database.db + (database.keys ? ' · ' + database.keys.toLocaleString() : '')"></option>
-                    </template>
-                </select>
-            </label>
             <button type="button" class="button ghost" @click="openInfo()" :disabled="busy">Server</button>
             <button type="button" class="button ghost" @click="openImport()" :disabled="busy">Import</button>
             <form method="post" action="logout.php">
